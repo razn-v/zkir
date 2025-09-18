@@ -6,38 +6,67 @@ type Field = usize;
 enum Expr {
     Var(VarRef),
     Constant(Field),
+
     Add(Box<Expr>, Box<Expr>),
     Sub(Box<Expr>, Box<Expr>),
     Mul(Box<Expr>, Box<Expr>),
+
+    Assign(VarRef, Box<Expr>),
+    Constrain(VarRef, Box<Expr>),
+
+    LessThan(Box<Expr>, Box<Expr>),
+    LessThanEq(Box<Expr>, Box<Expr>),
+    GreaterThan(Box<Expr>, Box<Expr>),
+    GreaterThanEq(Box<Expr>, Box<Expr>),
+    Equal(Box<Expr>, Box<Expr>),
 }
 
 impl Expr {
     fn transpile(&self, vars: &Vec<Variable>) -> String {
         match self {
-            Expr::Var(varref) => vars.get(*varref).unwrap().name.clone(),
+            Expr::Var(var) => vars.get(*var).unwrap().name.clone(),
             Expr::Constant(field) => field.to_string(),
             Expr::Add(left, right) => format!("{}+{}", left.transpile(vars), right.transpile(vars)),
             Expr::Sub(left, right) => format!("{}-{}", left.transpile(vars), right.transpile(vars)),
             Expr::Mul(left, right) => format!("{}*{}", left.transpile(vars), right.transpile(vars)),
+            Expr::Assign(var, right) => {
+                let var = vars.get(*var).unwrap();
+                assert_eq!(
+                    var.scope,
+                    VariableScope::Local,
+                    "Assignment is only possible with variables"
+                );
+                format!("{}={}", var.name, right.transpile(vars))
+            }
+            Expr::Constrain(var, right) => {
+                let var = vars.get(*var).unwrap();
+                assert_eq!(
+                    var.scope,
+                    VariableScope::Signal(SignalType::Output),
+                    "Assignment is only possible with variables"
+                );
+                format!("{}<=={}", var.name, right.transpile(vars))
+            }
+            Expr::LessThan(left, right) => {
+                format!("{}<{}", left.transpile(vars), right.transpile(vars))
+            }
+            Expr::LessThanEq(left, right) => {
+                format!("{}<={}", left.transpile(vars), right.transpile(vars))
+            }
+            Expr::GreaterThan(left, right) => {
+                format!("{}>{}", left.transpile(vars), right.transpile(vars))
+            }
+            Expr::GreaterThanEq(left, right) => {
+                format!("{}>={}", left.transpile(vars), right.transpile(vars))
+            }
+            Expr::Equal(left, right) => {
+                format!("{}=={}", left.transpile(vars), right.transpile(vars))
+            }
         }
     }
 }
 
-struct Constraint {
-    left: Expr,
-    right: Expr,
-}
-
-impl Constraint {
-    fn transpile(&self, vars: &Vec<Variable>) -> String {
-        format!(
-            "{} <== {};",
-            self.left.transpile(vars),
-            self.right.transpile(vars)
-        )
-    }
-}
-
+#[derive(Debug)]
 enum VariableType {
     Field,
     Array(usize),
@@ -55,6 +84,7 @@ enum VariableScope {
     Local,
 }
 
+#[derive(Debug)]
 struct Variable {
     id: VarRef,
     name: String,
@@ -92,24 +122,16 @@ impl Variable {
 }
 
 enum Instruction {
-    Constrain {
-        target: VarRef,
-        value: Expr,
-    },
-    Assign {
-        target: VarRef,
-        value: Expr,
-    },
+    ExprStmt(Expr),
     If {
         cond: Expr,
         then_branch: Vec<Instruction>,
         else_branch: Option<Vec<Instruction>>,
     },
     For {
-        var: VarRef,
-        start: Expr,
-        end: Expr,
-        expr: Expr,
+        init: Expr,
+        cond: Expr,
+        step: Expr,
         body: Vec<Instruction>,
     },
     While {
@@ -121,24 +143,7 @@ enum Instruction {
 impl Instruction {
     fn transpile(&self, vars: &Vec<Variable>) -> String {
         match self {
-            Instruction::Constrain { target, value } => {
-                let var = vars.get(*target).unwrap();
-                assert_eq!(
-                    var.scope,
-                    VariableScope::Signal(SignalType::Output),
-                    "Constraints are only allowed with signal outputs"
-                );
-                format!("{} <== {};", var.name, value.transpile(vars))
-            }
-            Instruction::Assign { target, value } => {
-                let var = vars.get(*target).unwrap();
-                assert_eq!(
-                    var.scope,
-                    VariableScope::Local,
-                    "Assignment is only possible with variables"
-                );
-                format!("{} = {};", var.name, value.transpile(vars))
-            }
+            Instruction::ExprStmt(expr) => format!("{};", expr.transpile(vars)),
             Instruction::If {
                 cond,
                 then_branch,
@@ -178,22 +183,26 @@ impl Instruction {
                 }
             }
             Instruction::For {
-                var,
-                start,
-                end,
-                expr,
+                init,
+                cond,
+                step,
                 body,
             } => {
+                assert!(
+                    matches!(init, Expr::Assign(_, _)),
+                    "For-loop inits must be an assignment"
+                );
+                assert!(!body.is_empty(), "Empty for loop bodies are not allowed");
+
                 format!(
                     r#"
-                    for (var {var} = {start}; {var} < {end}; {expr}) {{
+                    for ({init}; {cond}; {step}) {{
                         {body}
                     }}
                     "#,
-                    var = vars.get(*var).unwrap().name,
-                    start = start.transpile(vars),
-                    end = end.transpile(vars),
-                    expr = expr.transpile(vars),
+                    init = init.transpile(vars),
+                    cond = cond.transpile(vars),
+                    step = step.transpile(vars),
                     body = body
                         .iter()
                         .map(|ins| ins.transpile(vars))
@@ -243,36 +252,21 @@ component main = Program();
 
 fn main() {
     let mut circuit = Circuit {
-        variables: vec![
-            Variable {
-                id: 0,
-                name: String::from("myvar"),
-                _type: VariableType::Field,
-                scope: VariableScope::Local,
-            },
-            Variable {
-                id: 1,
-                name: String::from("myarray"),
-                _type: VariableType::Field,
-                scope: VariableScope::Local,
-            },
-        ],
-        instructions: vec![
-            Instruction::Constrain {
-                target: 0,
-                value: Expr::Constant(1),
-            },
-            Instruction::For {
-                var: 0,
-                start: Expr::Constant(0),
-                end: Expr::Constant(10),
-                expr: Expr::Add(Box::new(Expr::Var(0)), Box::new(Expr::Constant(1))),
-                body: vec![Instruction::Constrain {
-                    target: 0,
-                    value: Expr::Mul(Box::new(Expr::Var(0)), Box::new(Expr::Var(0))),
-                }],
-            },
-        ],
+        variables: vec![Variable {
+            id: 0,
+            name: String::from("myvar"),
+            _type: VariableType::Field,
+            scope: VariableScope::Local,
+        }],
+        instructions: vec![Instruction::For {
+            init: Expr::Assign(0, Box::new(Expr::Constant(123))),
+            cond: Expr::LessThan(Box::new(Expr::Var(0)), Box::new(Expr::Constant(42))),
+            step: Expr::Add(Box::new(Expr::Var(0)), Box::new(Expr::Constant(1))),
+            body: vec![Instruction::ExprStmt(Expr::Add(
+                Box::new(Expr::Constant(1)),
+                Box::new(Expr::Constant(1)),
+            ))],
+        }],
     };
 
     let output = circuit.transpile();
