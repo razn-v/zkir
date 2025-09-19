@@ -26,10 +26,25 @@ fn main() {
             init: Expr::Assign(VarRef(0), Box::new(Expr::Constant(123))),
             cond: Expr::LessThan(Box::new(Expr::Var(VarRef(0))), Box::new(Expr::Constant(42))),
             step: Expr::Assign(VarRef(0), Box::new(Expr::Constant(1))),
-            body: vec![Instruction::ExprStmt(Expr::Assign(
-                VarRef(1),
-                Box::new(Expr::Not(Box::new(Expr::Constant(5)))),
-            ))],
+            body: vec![
+                Instruction::ExprStmt(Expr::Assign(
+                    VarRef(1),
+                    Box::new(Expr::Not(Box::new(Expr::Constant(5)))),
+                )),
+                Instruction::While {
+                    cond: Expr::LessThan(
+                        Box::new(Expr::Var(VarRef(1))),
+                        Box::new(Expr::Constant(12)),
+                    ),
+                    body: vec![Instruction::ExprStmt(Expr::Assign(
+                        VarRef(1),
+                        Box::new(Expr::Add(
+                            Box::new(Expr::Var(VarRef(1))),
+                            Box::new(Expr::Constant(1)),
+                        )),
+                    ))],
+                },
+            ],
         }],
     };
 

@@ -226,7 +226,23 @@ impl CircomTranspiler {
                         .join("\n")
                 )
             }
-            Instruction::While { cond, body } => String::new(),
+            Instruction::While { cond, body } => {
+                assert!(!body.is_empty(), "Empty while loop bodies are not allowed");
+
+                format!(
+                    r#"
+                    while ({cond}) {{
+                        {body}
+                    }}
+                    "#,
+                    cond = self.transpile_expr(cond),
+                    body = body
+                        .iter()
+                        .map(|ins| self.transpile_instruction(ins))
+                        .collect::<Vec<String>>()
+                        .join("\n")
+                )
+            }
         }
     }
 
