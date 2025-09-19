@@ -26,6 +26,26 @@ impl CircomTranspiler {
                 self.transpile_expr(left),
                 self.transpile_expr(right)
             ),
+            Expr::Power(left, right) => format!(
+                "{}**{}",
+                self.transpile_expr(left),
+                self.transpile_expr(right)
+            ),
+            Expr::Div(left, right) => format!(
+                "{}/{}",
+                self.transpile_expr(left),
+                self.transpile_expr(right)
+            ),
+            Expr::IntDiv(left, right) => format!(
+                "{}\\{}",
+                self.transpile_expr(left),
+                self.transpile_expr(right)
+            ),
+            Expr::Rem(left, right) => format!(
+                "{}%{}",
+                self.transpile_expr(left),
+                self.transpile_expr(right)
+            ),
             Expr::Assign(var, right) => {
                 let var = self.circuit.variables.get(var.0).unwrap();
                 assert_eq!(

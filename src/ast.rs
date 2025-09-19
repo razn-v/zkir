@@ -10,6 +10,10 @@ pub enum Expr {
     Add(Box<Expr>, Box<Expr>),
     Sub(Box<Expr>, Box<Expr>),
     Mul(Box<Expr>, Box<Expr>),
+    Power(Box<Expr>, Box<Expr>),
+    Div(Box<Expr>, Box<Expr>),
+    IntDiv(Box<Expr>, Box<Expr>),
+    Rem(Box<Expr>, Box<Expr>),
 
     Assign(VarRef, Box<Expr>),
     Constrain(VarRef, Box<Expr>),
