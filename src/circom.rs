@@ -114,6 +114,42 @@ impl CircomTranspiler {
                 )
             }
             Expr::Not(expr) => format!("!{}", self.transpile_expr(expr)),
+            Expr::BitAnd(left, right) => {
+                format!(
+                    "{}&{}",
+                    self.transpile_expr(left),
+                    self.transpile_expr(right)
+                )
+            }
+            Expr::BitOr(left, right) => {
+                format!(
+                    "{}|{}",
+                    self.transpile_expr(left),
+                    self.transpile_expr(right)
+                )
+            }
+            Expr::BitNot(expr) => format!("~{}", self.transpile_expr(expr)),
+            Expr::BitXor(left, right) => {
+                format!(
+                    "{}^{}",
+                    self.transpile_expr(left),
+                    self.transpile_expr(right)
+                )
+            }
+            Expr::BitRShift(left, right) => {
+                format!(
+                    "{}>>{}",
+                    self.transpile_expr(left),
+                    self.transpile_expr(right)
+                )
+            }
+            Expr::BitLShift(left, right) => {
+                format!(
+                    "{}<<{}",
+                    self.transpile_expr(left),
+                    self.transpile_expr(right)
+                )
+            }
         }
     }
 

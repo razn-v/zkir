@@ -27,6 +27,13 @@ pub enum Expr {
     And(Box<Expr>, Box<Expr>),
     Or(Box<Expr>, Box<Expr>),
     Not(Box<Expr>),
+
+    BitAnd(Box<Expr>, Box<Expr>),
+    BitOr(Box<Expr>, Box<Expr>),
+    BitNot(Box<Expr>),
+    BitXor(Box<Expr>, Box<Expr>),
+    BitRShift(Box<Expr>, Box<Expr>),
+    BitLShift(Box<Expr>, Box<Expr>),
 }
 
 #[derive(Debug)]
