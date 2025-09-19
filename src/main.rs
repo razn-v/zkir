@@ -13,13 +13,13 @@ fn main() {
                 id: VarRef(0),
                 name: String::from("myvar"),
                 _type: VariableType::Field,
-                scope: VariableScope::Local,
+                role: VariableRole::Local,
             },
             Variable {
                 id: VarRef(1),
                 name: String::from("myvar2"),
                 _type: VariableType::Field,
-                scope: VariableScope::Local,
+                role: VariableRole::Local,
             },
         ],
         instructions: vec![Instruction::For {

@@ -29,8 +29,8 @@ impl CircomTranspiler {
             Expr::Assign(var, right) => {
                 let var = self.circuit.variables.get(var.0).unwrap();
                 assert_eq!(
-                    var.scope,
-                    VariableScope::Local,
+                    var.role,
+                    VariableRole::Local,
                     "Assignment is only possible with variables"
                 );
                 format!("{}={}", var.name, self.transpile_expr(right))
@@ -38,8 +38,8 @@ impl CircomTranspiler {
             Expr::Constrain(var, right) => {
                 let var = self.circuit.variables.get(var.0).unwrap();
                 assert_eq!(
-                    var.scope,
-                    VariableScope::Signal(SignalType::Output),
+                    var.role,
+                    VariableRole::Signal(SignalType::Output),
                     "Assignment is only possible with variables"
                 );
                 format!("{}<=={}", var.name, self.transpile_expr(right))
@@ -175,15 +175,15 @@ impl CircomTranspiler {
     }
 
     fn transpile_variable(&self, var: &Variable) -> String {
-        let prefix = match &var.scope {
-            VariableScope::Signal(_type) => {
+        let prefix = match &var.role {
+            VariableRole::Signal(_type) => {
                 let _type = match _type {
                     SignalType::Input => "input",
                     SignalType::Output => "output",
                 };
                 format!("signal {_type}")
             }
-            VariableScope::Local => String::from("var"),
+            VariableRole::Local => String::from("var"),
         };
 
         match var._type {

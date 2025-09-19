@@ -38,7 +38,7 @@ pub enum SignalType {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum VariableScope {
+pub enum VariableRole {
     Signal(SignalType),
     Local,
 }
@@ -48,7 +48,7 @@ pub struct Variable {
     pub id: VarRef,
     pub name: String,
     pub _type: VariableType,
-    pub scope: VariableScope,
+    pub role: VariableRole,
 }
 
 pub enum Instruction {
