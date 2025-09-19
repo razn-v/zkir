@@ -1,4 +1,6 @@
-pub type VarRef = usize;
+#[derive(Debug)]
+pub struct VarRef(pub usize);
+
 pub type Field = usize;
 
 pub enum Expr {

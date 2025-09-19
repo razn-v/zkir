@@ -7,7 +7,7 @@ pub struct CircomTranspiler {
 impl CircomTranspiler {
     fn transpile_expr(&self, expr: &Expr) -> String {
         match expr {
-            Expr::Var(var) => self.circuit.variables.get(*var).unwrap().name.clone(),
+            Expr::Var(var) => self.circuit.variables.get(var.0).unwrap().name.clone(),
             Expr::Constant(field) => field.to_string(),
             Expr::Add(left, right) => {
                 format!(
@@ -27,7 +27,7 @@ impl CircomTranspiler {
                 self.transpile_expr(right)
             ),
             Expr::Assign(var, right) => {
-                let var = self.circuit.variables.get(*var).unwrap();
+                let var = self.circuit.variables.get(var.0).unwrap();
                 assert_eq!(
                     var.scope,
                     VariableScope::Local,
@@ -36,7 +36,7 @@ impl CircomTranspiler {
                 format!("{}={}", var.name, self.transpile_expr(right))
             }
             Expr::Constrain(var, right) => {
-                let var = self.circuit.variables.get(*var).unwrap();
+                let var = self.circuit.variables.get(var.0).unwrap();
                 assert_eq!(
                     var.scope,
                     VariableScope::Signal(SignalType::Output),
