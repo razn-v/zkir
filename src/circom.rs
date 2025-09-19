@@ -79,6 +79,21 @@ impl CircomTranspiler {
                     self.transpile_expr(right)
                 )
             }
+            Expr::And(left, right) => {
+                format!(
+                    "{}&&{}",
+                    self.transpile_expr(left),
+                    self.transpile_expr(right)
+                )
+            }
+            Expr::Or(left, right) => {
+                format!(
+                    "{}||{}",
+                    self.transpile_expr(left),
+                    self.transpile_expr(right)
+                )
+            }
+            Expr::Not(expr) => format!("!{}", self.transpile_expr(expr)),
         }
     }
 

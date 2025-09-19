@@ -19,6 +19,10 @@ pub enum Expr {
     GreaterThan(Box<Expr>, Box<Expr>),
     GreaterThanEq(Box<Expr>, Box<Expr>),
     Equal(Box<Expr>, Box<Expr>),
+
+    And(Box<Expr>, Box<Expr>),
+    Or(Box<Expr>, Box<Expr>),
+    Not(Box<Expr>),
 }
 
 #[derive(Debug)]
