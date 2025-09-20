@@ -60,7 +60,7 @@ pub enum VariableRole {
 pub struct Variable {
     pub id: VarRef,
     pub name: String,
-    pub _type: VariableType,
+    pub var_type: VariableType,
     pub role: VariableRole,
 }
 
@@ -86,4 +86,11 @@ pub enum Instruction {
 pub struct Circuit {
     pub variables: Vec<Variable>,
     pub instructions: Vec<Instruction>,
+}
+
+impl Circuit {
+    pub fn get_variable(&self, var: &VarRef) -> &Variable {
+        // Variable are assumed to be contiguous inside `self.variables` based on their id
+        self.variables.get(var.0).unwrap()
+    }
 }

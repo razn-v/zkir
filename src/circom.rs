@@ -1,16 +1,20 @@
 use crate::ast::*;
 
-pub struct CircomTranspiler {
-    pub circuit: Circuit,
+pub struct CircomTranspiler<'a> {
+    pub circuit: &'a Circuit,
 }
 
-impl CircomTranspiler {
+impl<'a> CircomTranspiler<'a> {
+    pub fn new(circuit: &'a Circuit) -> Self {
+        Self { circuit }
+    }
+
     fn transpile_expr(&self, expr: &Expr) -> String {
         match expr {
-            Expr::Var(var) => self.circuit.variables.get(var.0).unwrap().name.clone(),
+            Expr::Var(varref) => self.circuit.get_variable(varref).name.clone(),
             Expr::Constant(field) => field.to_string(),
-            Expr::ArrayIndex(var, expr) => {
-                let var = self.circuit.variables.get(var.0).unwrap();
+            Expr::ArrayIndex(varref, expr) => {
+                let var = self.circuit.get_variable(varref);
                 format!("{}[{}]", var.name, self.transpile_expr(expr))
             }
             Expr::Add(left, right) => {
@@ -50,8 +54,8 @@ impl CircomTranspiler {
                 self.transpile_expr(left),
                 self.transpile_expr(right)
             ),
-            Expr::Assign(var, right) => {
-                let var = self.circuit.variables.get(var.0).unwrap();
+            Expr::Assign(varref, right) => {
+                let var = self.circuit.get_variable(varref);
                 assert_eq!(
                     var.role,
                     VariableRole::Local,
@@ -60,14 +64,14 @@ impl CircomTranspiler {
 
                 format!("{}={}", var.name, self.transpile_expr(right))
             }
-            Expr::ArrayAssign(var, index, val) => {
-                let var = self.circuit.variables.get(var.0).unwrap();
+            Expr::ArrayAssign(varref, index, val) => {
+                let var = self.circuit.get_variable(varref);
                 assert_eq!(
                     var.role,
                     VariableRole::Local,
                     "Assignment is only possible with variables"
                 );
-                assert!(matches!(var._type, VariableType::Array(_)));
+                assert!(matches!(var.var_type, VariableType::Array(_)));
 
                 format!(
                     "{}[{}]={}",
@@ -76,8 +80,8 @@ impl CircomTranspiler {
                     self.transpile_expr(val)
                 )
             }
-            Expr::Constrain(var, right) => {
-                let var = self.circuit.variables.get(var.0).unwrap();
+            Expr::Constrain(varref, right) => {
+                let var = self.circuit.get_variable(varref);
                 assert_eq!(
                     var.role,
                     VariableRole::Signal(SignalType::Output),
@@ -279,7 +283,7 @@ impl CircomTranspiler {
             VariableRole::Local => String::from("var"),
         };
 
-        match var._type {
+        match var.var_type {
             VariableType::Field => {
                 format!("{prefix} {name};", prefix = prefix, name = var.name)
             }

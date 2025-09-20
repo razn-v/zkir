@@ -12,25 +12,25 @@ fn main() {
             Variable {
                 id: VarRef(0),
                 name: String::from("myvar"),
-                _type: VariableType::Field,
+                var_type: VariableType::Field,
                 role: VariableRole::Local,
             },
             Variable {
                 id: VarRef(1),
                 name: String::from("myvar2"),
-                _type: VariableType::Field,
+                var_type: VariableType::Field,
                 role: VariableRole::Local,
             },
             Variable {
                 id: VarRef(2),
                 name: String::from("myarray"),
-                _type: VariableType::Array(5),
+                var_type: VariableType::Array(5),
                 role: VariableRole::Local,
             },
             Variable {
                 id: VarRef(3),
                 name: String::from("myoutput"),
-                _type: VariableType::Field,
+                var_type: VariableType::Field,
                 role: VariableRole::Signal(SignalType::Output),
             },
         ],
@@ -69,7 +69,7 @@ fn main() {
         }],
     };
 
-    let circom_backend = CircomTranspiler { circuit: circuit };
+    let circom_backend = CircomTranspiler::new(&circuit);
     let output = circom_backend.transpile_circuit();
 
     let mut file = std::fs::File::create("./circuit.circom").unwrap();
