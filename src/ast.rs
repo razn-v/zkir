@@ -6,6 +6,7 @@ pub type Field = usize;
 pub enum Expr {
     Var(VarRef),
     Constant(Field),
+    ArrayIndex(VarRef, Box<Expr>),
 
     Add(Box<Expr>, Box<Expr>),
     Sub(Box<Expr>, Box<Expr>),
@@ -16,6 +17,7 @@ pub enum Expr {
     Rem(Box<Expr>, Box<Expr>),
 
     Assign(VarRef, Box<Expr>),
+    ArrayAssign(VarRef, Box<Expr>, Box<Expr>),
     Constrain(VarRef, Box<Expr>),
 
     LessThan(Box<Expr>, Box<Expr>),

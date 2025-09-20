@@ -9,6 +9,10 @@ impl CircomTranspiler {
         match expr {
             Expr::Var(var) => self.circuit.variables.get(var.0).unwrap().name.clone(),
             Expr::Constant(field) => field.to_string(),
+            Expr::ArrayIndex(var, expr) => {
+                let var = self.circuit.variables.get(var.0).unwrap();
+                format!("{}[{}]", var.name, self.transpile_expr(expr))
+            }
             Expr::Add(left, right) => {
                 format!(
                     "{}+{}",
@@ -53,7 +57,24 @@ impl CircomTranspiler {
                     VariableRole::Local,
                     "Assignment is only possible with variables"
                 );
+
                 format!("{}={}", var.name, self.transpile_expr(right))
+            }
+            Expr::ArrayAssign(var, index, val) => {
+                let var = self.circuit.variables.get(var.0).unwrap();
+                assert_eq!(
+                    var.role,
+                    VariableRole::Local,
+                    "Assignment is only possible with variables"
+                );
+                assert!(matches!(var._type, VariableType::Array(_)));
+
+                format!(
+                    "{}[{}]={}",
+                    var.name,
+                    self.transpile_expr(index),
+                    self.transpile_expr(val)
+                )
             }
             Expr::Constrain(var, right) => {
                 let var = self.circuit.variables.get(var.0).unwrap();
