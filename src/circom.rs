@@ -181,6 +181,32 @@ impl<'a> CircomTranspiler<'a> {
     fn transpile_instruction(&self, instr: &Instruction) -> String {
         match instr {
             Instruction::ExprStmt(expr) => format!("{};", self.transpile_expr(expr)),
+            Instruction::VarDecl(var) => {
+                let prefix = match &var.role {
+                    VariableRole::Signal(signal_type) => {
+                        let signal_type = match signal_type {
+                            SignalType::Input => "input",
+                            SignalType::Output => "output",
+                        };
+                        format!("signal {signal_type}")
+                    }
+                    VariableRole::Local => String::from("var"),
+                };
+
+                match var.var_type {
+                    VariableType::Field => {
+                        format!("{prefix} {name};", name = var.name)
+                    }
+                    VariableType::Array(size) => {
+                        format!(
+                            "{prefix} {name}[{size}];",
+                            prefix = prefix,
+                            name = var.name,
+                            size = size
+                        )
+                    }
+                }
+            }
             Instruction::If {
                 cond,
                 then_branch,
@@ -271,60 +297,23 @@ impl<'a> CircomTranspiler<'a> {
         }
     }
 
-    fn transpile_variable(&self, var: &Variable) -> String {
-        let prefix = match &var.role {
-            VariableRole::Signal(_type) => {
-                let _type = match _type {
-                    SignalType::Input => "input",
-                    SignalType::Output => "output",
-                };
-                format!("signal {_type}")
-            }
-            VariableRole::Local => String::from("var"),
-        };
-
-        match var.var_type {
-            VariableType::Field => {
-                format!("{prefix} {name};", prefix = prefix, name = var.name)
-            }
-            VariableType::Array(size) => {
-                format!(
-                    "{prefix} {name}[{size}];",
-                    prefix = prefix,
-                    name = var.name,
-                    size = size
-                )
-            }
-        }
-    }
-
     pub fn transpile_circuit(&self) -> String {
-        let variables: String = self
-            .circuit
-            .variables
-            .iter()
-            .map(|var| self.transpile_variable(var))
-            .collect::<Vec<String>>()
-            .join("\n    ");
         let instructions: String = self
             .circuit
             .instructions
             .iter()
-            .map(|ins| self.transpile_instruction(ins))
+            .map(|ins| self.transpile_instruction(ins) + "\n")
             .collect::<Vec<String>>()
             .concat();
 
         format!(
             r#"
 template Program() {{
-    {variables}
     {instructions}
 }}
 
 component main = Program();
-        "#,
-            variables = variables,
-            instructions = instructions,
+        "#
         )
     }
 }

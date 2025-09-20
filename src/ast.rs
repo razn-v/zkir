@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct VarRef(pub usize);
 
 pub type Field = usize;
@@ -38,25 +38,25 @@ pub enum Expr {
     BitLShift(Box<Expr>, Box<Expr>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum VariableType {
     Field,
     Array(usize),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum SignalType {
     Input,
     Output,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum VariableRole {
     Signal(SignalType),
     Local,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Variable {
     pub id: VarRef,
     pub name: String,
@@ -66,6 +66,7 @@ pub struct Variable {
 
 pub enum Instruction {
     ExprStmt(Expr),
+    VarDecl(Variable),
     If {
         cond: Expr,
         then_branch: Vec<Instruction>,
@@ -84,13 +85,27 @@ pub enum Instruction {
 }
 
 pub struct Circuit {
-    pub variables: Vec<Variable>,
+    variables: Vec<Variable>,
     pub instructions: Vec<Instruction>,
 }
 
 impl Circuit {
-    pub fn get_variable(&self, var: &VarRef) -> &Variable {
-        // Variable are assumed to be contiguous inside `self.variables` based on their id
-        self.variables.get(var.0).unwrap()
+    pub fn new(instructions: Vec<Instruction>) -> Self {
+        let mut variables = Vec::new();
+
+        for instr in &instructions {
+            if let Instruction::VarDecl(var) = instr {
+                variables.push(var.clone());
+            }
+        }
+
+        Self {
+            variables,
+            instructions,
+        }
+    }
+
+    pub fn get_variable(&self, varref: &VarRef) -> &Variable {
+        self.variables.iter().find(|var| var.id == *varref).unwrap()
     }
 }

@@ -7,34 +7,32 @@ use crate::ast::*;
 use crate::circom::*;
 
 fn main() {
-    let circuit = Circuit {
-        variables: vec![
-            Variable {
-                id: VarRef(0),
-                name: String::from("myvar"),
-                var_type: VariableType::Field,
-                role: VariableRole::Local,
-            },
-            Variable {
-                id: VarRef(1),
-                name: String::from("myvar2"),
-                var_type: VariableType::Field,
-                role: VariableRole::Local,
-            },
-            Variable {
-                id: VarRef(2),
-                name: String::from("myarray"),
-                var_type: VariableType::Array(5),
-                role: VariableRole::Local,
-            },
-            Variable {
-                id: VarRef(3),
-                name: String::from("myoutput"),
-                var_type: VariableType::Field,
-                role: VariableRole::Signal(SignalType::Output),
-            },
-        ],
-        instructions: vec![Instruction::For {
+    let circuit = Circuit::new(vec![
+        Instruction::VarDecl(Variable {
+            id: VarRef(0),
+            name: String::from("myvar"),
+            var_type: VariableType::Field,
+            role: VariableRole::Local,
+        }),
+        Instruction::VarDecl(Variable {
+            id: VarRef(1),
+            name: String::from("myvar2"),
+            var_type: VariableType::Field,
+            role: VariableRole::Local,
+        }),
+        Instruction::VarDecl(Variable {
+            id: VarRef(2),
+            name: String::from("myarray"),
+            var_type: VariableType::Array(5),
+            role: VariableRole::Local,
+        }),
+        Instruction::VarDecl(Variable {
+            id: VarRef(3),
+            name: String::from("myoutput"),
+            var_type: VariableType::Field,
+            role: VariableRole::Signal(SignalType::Output),
+        }),
+        Instruction::For {
             init: Expr::Assign(VarRef(0), Box::new(Expr::Constant(123))),
             cond: Expr::LessThan(Box::new(Expr::Var(VarRef(0))), Box::new(Expr::Constant(42))),
             step: Expr::Assign(VarRef(0), Box::new(Expr::Constant(1))),
@@ -66,8 +64,8 @@ fn main() {
                     Box::new(Expr::ArrayIndex(VarRef(2), Box::new(Expr::Constant(2)))),
                 )),
             ],
-        }],
-    };
+        },
+    ]);
 
     let circom_backend = CircomTranspiler::new(&circuit);
     let output = circom_backend.transpile_circuit();
