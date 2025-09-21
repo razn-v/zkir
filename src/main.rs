@@ -59,7 +59,7 @@ fn main() {
                         )),
                     ))],
                 },
-                Instruction::ExprStmt(Expr::Constrain(
+                Instruction::ExprStmt(Expr::Constraint(
                     VarRef(3),
                     Box::new(Expr::ArrayIndex(VarRef(2), Box::new(Expr::Constant(2)))),
                 )),

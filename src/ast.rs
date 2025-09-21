@@ -5,6 +5,7 @@ pub struct VarRef(pub usize);
 
 pub type Field = usize;
 
+#[derive(Clone)]
 pub enum Expr {
     Var(VarRef),
     Constant(Field),
@@ -20,7 +21,7 @@ pub enum Expr {
 
     Assign(VarRef, Box<Expr>),
     ArrayAssign(VarRef, Box<Expr>, Box<Expr>),
-    Constrain(VarRef, Box<Expr>),
+    Constraint(VarRef, Box<Expr>),
 
     LessThan(Box<Expr>, Box<Expr>),
     LessThanEq(Box<Expr>, Box<Expr>),
@@ -66,6 +67,7 @@ pub struct Variable {
     pub role: VariableRole,
 }
 
+#[derive(Clone)]
 pub enum Instruction {
     ExprStmt(Expr),
     VarDecl(Variable),
@@ -108,6 +110,9 @@ impl Circuit {
     }
 
     pub fn get_variable(&self, varref: &VarRef) -> &Variable {
-        self.variables.iter().find(|var| var.id == *varref).unwrap()
+        self.variables
+            .iter()
+            .find(|var| var.id == *varref)
+            .expect(&format!("Variable {} not found", varref.0))
     }
 }

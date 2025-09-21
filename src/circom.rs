@@ -78,7 +78,7 @@ impl<'a> CircomTranspiler<'a> {
                 assert_eq!(
                     var.role,
                     VariableRole::Local,
-                    "Assignment is only possible with variables"
+                    "Assignment is only possible between variables"
                 );
                 assert!(matches!(var.var_type, VariableType::Array(_)));
 
@@ -89,12 +89,12 @@ impl<'a> CircomTranspiler<'a> {
                     self.transpile_expr(val)
                 )
             }
-            Expr::Constrain(varref, right) => {
+            Expr::Constraint(varref, right) => {
                 let var = self.circuit.get_variable(varref);
                 assert_eq!(
                     var.role,
                     VariableRole::Signal(SignalType::Output),
-                    "Assignment is only possible with variables"
+                    "Constraint are only possible when the target is an output signal"
                 );
                 format!("{}<=={}", var.name, self.transpile_expr(right))
             }
@@ -227,7 +227,13 @@ impl<'a> CircomTranspiler<'a> {
                 let mut res = String::new();
 
                 if let Some(else_branch) = else_branch {
-                    write!(&mut res, "if ({}) {{\n", self.transpile_expr(cond)).unwrap();
+                    write!(
+                        &mut res,
+                        "{}if ({}) {{\n",
+                        self.get_indent(),
+                        self.transpile_expr(cond)
+                    )
+                    .unwrap();
 
                     self.indent_size += 1;
                     write!(
@@ -242,7 +248,7 @@ impl<'a> CircomTranspiler<'a> {
                     .unwrap();
 
                     self.indent_size -= 1;
-                    write!(&mut res, "}} else {{\n").unwrap();
+                    write!(&mut res, "{}}} else {{\n", self.get_indent()).unwrap();
 
                     self.indent_size += 1;
                     write!(
@@ -259,7 +265,13 @@ impl<'a> CircomTranspiler<'a> {
                     self.indent_size -= 1;
                     write!(&mut res, "{}}}", self.get_indent()).unwrap();
                 } else {
-                    write!(&mut res, "if ({}) {{\n", self.transpile_expr(cond)).unwrap();
+                    write!(
+                        &mut res,
+                        "{}if ({}) {{\n",
+                        self.get_indent(),
+                        self.transpile_expr(cond)
+                    )
+                    .unwrap();
 
                     self.indent_size += 1;
                     write!(
