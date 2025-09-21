@@ -1,12 +1,21 @@
 use crate::ast::*;
+use std::fmt::Write;
 
 pub struct CircomTranspiler<'a> {
     pub circuit: &'a Circuit,
+    indent_size: usize,
 }
 
 impl<'a> CircomTranspiler<'a> {
     pub fn new(circuit: &'a Circuit) -> Self {
-        Self { circuit }
+        Self {
+            circuit,
+            indent_size: 1,
+        }
+    }
+
+    fn get_indent(&self) -> String {
+        "   ".repeat(self.indent_size)
     }
 
     fn transpile_expr(&self, expr: &Expr) -> String {
@@ -178,9 +187,11 @@ impl<'a> CircomTranspiler<'a> {
         }
     }
 
-    fn transpile_instruction(&self, instr: &Instruction) -> String {
+    fn transpile_instruction(&mut self, instr: &Instruction) -> String {
         match instr {
-            Instruction::ExprStmt(expr) => format!("{};", self.transpile_expr(expr)),
+            Instruction::ExprStmt(expr) => {
+                format!("{}{};", self.get_indent(), self.transpile_expr(expr))
+            }
             Instruction::VarDecl(var) => {
                 let prefix = match &var.role {
                     VariableRole::Signal(signal_type) => {
@@ -195,11 +206,12 @@ impl<'a> CircomTranspiler<'a> {
 
                 match var.var_type {
                     VariableType::Field => {
-                        format!("{prefix} {name};", name = var.name)
+                        format!("{}{prefix} {name};", self.get_indent(), name = var.name)
                     }
                     VariableType::Array(size) => {
                         format!(
-                            "{prefix} {name}[{size}];",
+                            "{}{prefix} {name}[{size}];",
+                            self.get_indent(),
                             prefix = prefix,
                             name = var.name,
                             size = size
@@ -212,38 +224,60 @@ impl<'a> CircomTranspiler<'a> {
                 then_branch,
                 else_branch,
             } => {
+                let mut res = String::new();
+
                 if let Some(else_branch) = else_branch {
-                    format!(
-                        r#"if ({}) {{
-                            {}
-                        }} else {{
-                            {}
-                        }}"#,
-                        self.transpile_expr(cond),
-                        then_branch
-                            .iter()
-                            .map(|ins| self.transpile_instruction(ins))
-                            .collect::<Vec<String>>()
-                            .join("\n"),
-                        else_branch
-                            .iter()
-                            .map(|ins| self.transpile_instruction(ins))
-                            .collect::<Vec<String>>()
-                            .join("\n"),
-                    )
-                } else {
-                    format!(
-                        r#"if ({}) {{
-                            {}
-                        }}"#,
-                        self.transpile_expr(cond),
+                    write!(&mut res, "if ({}) {{\n", self.transpile_expr(cond)).unwrap();
+
+                    self.indent_size += 1;
+                    write!(
+                        &mut res,
+                        "{}\n",
                         then_branch
                             .iter()
                             .map(|ins| self.transpile_instruction(ins))
                             .collect::<Vec<String>>()
                             .join("\n")
                     )
+                    .unwrap();
+
+                    self.indent_size -= 1;
+                    write!(&mut res, "}} else {{\n").unwrap();
+
+                    self.indent_size += 1;
+                    write!(
+                        &mut res,
+                        "{}\n",
+                        else_branch
+                            .iter()
+                            .map(|ins| self.transpile_instruction(ins))
+                            .collect::<Vec<String>>()
+                            .join("\n")
+                    )
+                    .unwrap();
+
+                    self.indent_size -= 1;
+                    write!(&mut res, "{}}}", self.get_indent()).unwrap();
+                } else {
+                    write!(&mut res, "if ({}) {{\n", self.transpile_expr(cond)).unwrap();
+
+                    self.indent_size += 1;
+                    write!(
+                        &mut res,
+                        "{}\n",
+                        then_branch
+                            .iter()
+                            .map(|ins| self.transpile_instruction(ins))
+                            .collect::<Vec<String>>()
+                            .join("\n")
+                    )
+                    .unwrap();
+
+                    self.indent_size -= 1;
+                    write!(&mut res, "{}}}", self.get_indent()).unwrap();
                 }
+
+                res
             }
             Instruction::For {
                 init,
@@ -261,43 +295,67 @@ impl<'a> CircomTranspiler<'a> {
                 );
                 assert!(!body.is_empty(), "Empty for loop bodies are not allowed");
 
-                format!(
-                    r#"
-                    for ({init}; {cond}; {step}) {{
-                        {body}
-                    }}
-                    "#,
+                let mut res = String::new();
+
+                write!(
+                    &mut res,
+                    "{}for ({init}; {cond}; {step}) {{\n",
+                    self.get_indent(),
                     init = self.transpile_expr(init),
                     cond = self.transpile_expr(cond),
                     step = self.transpile_expr(step),
-                    body = body
-                        .iter()
+                )
+                .unwrap();
+
+                self.indent_size += 1;
+                write!(
+                    &mut res,
+                    "{}\n",
+                    body.iter()
                         .map(|ins| self.transpile_instruction(ins))
                         .collect::<Vec<String>>()
                         .join("\n")
                 )
+                .unwrap();
+
+                self.indent_size -= 1;
+                write!(&mut res, "{}}}", self.get_indent()).unwrap();
+
+                res
             }
             Instruction::While { cond, body } => {
                 assert!(!body.is_empty(), "Empty while loop bodies are not allowed");
 
-                format!(
-                    r#"
-                    while ({cond}) {{
-                        {body}
-                    }}
-                    "#,
+                let mut res = String::new();
+
+                write!(
+                    &mut res,
+                    "{}while ({cond}) {{\n",
+                    self.get_indent(),
                     cond = self.transpile_expr(cond),
-                    body = body
-                        .iter()
+                )
+                .unwrap();
+
+                self.indent_size += 1;
+                write!(
+                    &mut res,
+                    "{}\n",
+                    body.iter()
                         .map(|ins| self.transpile_instruction(ins))
                         .collect::<Vec<String>>()
                         .join("\n")
                 )
+                .unwrap();
+
+                self.indent_size -= 1;
+                write!(&mut res, "{}}}", self.get_indent()).unwrap();
+
+                res
             }
         }
     }
 
-    pub fn transpile_circuit(&self) -> String {
+    pub fn transpile_circuit(&mut self) -> String {
         let instructions: String = self
             .circuit
             .instructions
@@ -309,8 +367,7 @@ impl<'a> CircomTranspiler<'a> {
         format!(
             r#"
 template Program() {{
-    {instructions}
-}}
+{instructions}}}
 
 component main = Program();
         "#

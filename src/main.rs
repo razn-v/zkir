@@ -67,7 +67,7 @@ fn main() {
         },
     ]);
 
-    let circom_backend = CircomTranspiler::new(&circuit);
+    let mut circom_backend = CircomTranspiler::new(&circuit);
     let output = circom_backend.transpile_circuit();
 
     let mut file = std::fs::File::create("./circuit.circom").unwrap();
