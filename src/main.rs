@@ -33,35 +33,41 @@ fn main() {
             role: VariableRole::Signal(SignalType::Output),
         }),
         Instruction::For {
-            init: Expr::Assign(VarRef(0), Box::new(Expr::Constant(123))),
-            cond: Expr::LessThan(Box::new(Expr::Var(VarRef(0))), Box::new(Expr::Constant(42))),
-            step: Expr::Assign(VarRef(0), Box::new(Expr::Constant(1))),
+            init: Expr::Assign(VarRef(0), Box::new(Expr::Constant(String::from("123")))),
+            cond: Expr::LessThan(
+                Box::new(Expr::Var(VarRef(0))),
+                Box::new(Expr::Constant(String::from("42"))),
+            ),
+            step: Expr::Assign(VarRef(0), Box::new(Expr::Constant(String::from("1")))),
             body: vec![
                 Instruction::ExprStmt(Expr::Assign(
                     VarRef(1),
-                    Box::new(Expr::Not(Box::new(Expr::Constant(5)))),
+                    Box::new(Expr::Not(Box::new(Expr::Constant(String::from("5"))))),
                 )),
                 Instruction::ExprStmt(Expr::ArrayAssign(
                     VarRef(2),
-                    Box::new(Expr::Constant(2)),
-                    Box::new(Expr::Constant(42)),
+                    Box::new(Expr::Constant(String::from("2"))),
+                    Box::new(Expr::Constant(String::from("42"))),
                 )),
                 Instruction::While {
                     cond: Expr::LessThan(
                         Box::new(Expr::Var(VarRef(1))),
-                        Box::new(Expr::Constant(12)),
+                        Box::new(Expr::Constant(String::from("12"))),
                     ),
                     body: vec![Instruction::ExprStmt(Expr::Assign(
                         VarRef(1),
                         Box::new(Expr::Add(
                             Box::new(Expr::Var(VarRef(1))),
-                            Box::new(Expr::Constant(1)),
+                            Box::new(Expr::Constant(String::from("1"))),
                         )),
                     ))],
                 },
                 Instruction::ExprStmt(Expr::Constraint(
                     VarRef(3),
-                    Box::new(Expr::ArrayIndex(VarRef(2), Box::new(Expr::Constant(2)))),
+                    Box::new(Expr::ArrayIndex(
+                        VarRef(2),
+                        Box::new(Expr::Constant(String::from("2"))),
+                    )),
                 )),
             ],
         },

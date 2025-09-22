@@ -3,7 +3,7 @@
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct VarRef(pub usize);
 
-pub type Field = usize;
+pub type Field = String;
 
 #[derive(Clone)]
 pub enum Expr {
