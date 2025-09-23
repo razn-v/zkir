@@ -26,7 +26,7 @@ impl Rng {
     }
 
     fn rand_char(&mut self) -> char {
-        const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
         let idx = self.rand(0, CHARSET.len() - 1);
         CHARSET[idx] as char

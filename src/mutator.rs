@@ -23,7 +23,7 @@ impl Mutator {
     pub fn generate(&mut self) -> Circuit {
         let mut instructions = Vec::new();
 
-        for _ in 1..self.rng.rand(1, 25) {
+        for _ in 1..self.rng.rand(15, 30) {
             instructions.push(self.generate_instr());
         }
 
@@ -40,7 +40,12 @@ impl Mutator {
         let instr: Instruction = match self.rng.rand(0, Instruction::INSTRUCTION_COUNT - 1) {
             0 => {
                 // ExprStmt
-                Instruction::ExprStmt(self.generate_expr())
+                let expr = self.generate_expr(0);
+                if matches!(expr, Expr::Nop) {
+                    Instruction::Nop
+                } else {
+                    Instruction::ExprStmt(expr)
+                }
             }
             1 => {
                 // VarDecl
@@ -48,7 +53,7 @@ impl Mutator {
             }
             2 => {
                 // If
-                let cond = self.generate_expr();
+                let cond = self.generate_expr(0);
 
                 let mut then_branch = Vec::<Instruction>::new();
                 for _ in 1..self.rng.rand(1, 5) {
@@ -73,13 +78,13 @@ impl Mutator {
             }
             3 => {
                 // For
-                let init = if let Expr::Assign(varr, expr) = self.generate_assign() {
+                let init = if let Expr::Assign(varr, expr) = self.generate_assign(0) {
                     Expr::Assign(varr, expr)
                 } else {
                     return Instruction::Nop;
                 };
-                let cond = self.generate_expr();
-                let step = if let Expr::Assign(varr, expr) = self.generate_assign() {
+                let cond = self.generate_expr(0);
+                let step = if let Expr::Assign(varr, expr) = self.generate_assign(0) {
                     Expr::Assign(varr, expr)
                 } else {
                     return Instruction::Nop;
@@ -103,7 +108,7 @@ impl Mutator {
             }
             4 => {
                 // While
-                let cond = self.generate_expr();
+                let cond = self.generate_expr(0);
 
                 let mut body = Vec::<Instruction>::new();
                 for _ in 1..self.rng.rand(1, 5) {
@@ -129,8 +134,21 @@ impl Mutator {
         instr
     }
 
-    pub fn generate_expr(&mut self) -> Expr {
-        if self.rng.rand(0, 1) == 0 {
+    pub fn generate_expr(&mut self, depth: usize) -> Expr {
+        /*if depth >= 10 {
+            return Expr::Nop;
+        }*/
+
+        if self.rng.rand(1, 3) == 1 {
+            return Expr::Constant(self.rng.next().to_string());
+        }
+
+        if self.rng.rand(1, 3) == 1 && !self.variables.is_empty() {
+            let varref = self.rng.rand(0, self.curr_var_id.unwrap());
+            return Expr::Var(VarRef(varref));
+        }
+
+        if self.rng.rand(1, 2) == 1 {
             return Expr::Nop;
         }
 
@@ -154,49 +172,79 @@ impl Mutator {
             }*/
             3 => {
                 // Add
-                let left = Box::new(self.generate_expr());
-                let right = Box::new(self.generate_expr());
-                Expr::Add(left, right)
+                let left = self.generate_expr(depth + 1);
+                let right = self.generate_expr(depth + 1);
+
+                if matches!(left, Expr::Nop) || matches!(right, Expr::Nop) {
+                    return Expr::Nop;
+                }
+
+                Expr::Add(Box::new(left), Box::new(right))
             }
             4 => {
                 // Sub
-                let left = Box::new(self.generate_expr());
-                let right = Box::new(self.generate_expr());
-                Expr::Sub(left, right)
+                let left = self.generate_expr(depth + 1);
+                let right = self.generate_expr(depth + 1);
+
+                if matches!(left, Expr::Nop) || matches!(right, Expr::Nop) {
+                    return Expr::Nop;
+                }
+
+                Expr::Sub(Box::new(left), Box::new(right))
             }
             5 => {
                 // Mul
-                let left = Box::new(self.generate_expr());
-                let right = Box::new(self.generate_expr());
-                Expr::Mul(left, right)
+                let left = self.generate_expr(depth + 1);
+                let right = self.generate_expr(depth + 1);
+
+                if matches!(left, Expr::Nop) || matches!(right, Expr::Nop) {
+                    return Expr::Nop;
+                }
+
+                Expr::Mul(Box::new(left), Box::new(right))
             }
             6 => {
                 // Power
-                let left = Box::new(self.generate_expr());
-                let right = Box::new(self.generate_expr());
-                Expr::Power(left, right)
+                let left = self.generate_expr(depth + 1);
+                let right = self.generate_expr(depth + 1);
+
+                if matches!(left, Expr::Nop) || matches!(right, Expr::Nop) {
+                    return Expr::Nop;
+                }
+
+                Expr::Power(Box::new(left), Box::new(right))
             }
             7 => {
                 // Div
-                let left = Box::new(self.generate_expr());
-                let right = Box::new(self.generate_expr());
+                let left = Box::new(self.generate_expr(depth + 1));
+                let right = Box::new(self.generate_expr(depth + 1));
                 Expr::Div(left, right)
             }
             8 => {
                 // IntDiv
-                let left = Box::new(self.generate_expr());
-                let right = Box::new(self.generate_expr());
-                Expr::IntDiv(left, right)
+                let left = self.generate_expr(depth + 1);
+                let right = self.generate_expr(depth + 1);
+
+                if matches!(left, Expr::Nop) || matches!(right, Expr::Nop) {
+                    return Expr::Nop;
+                }
+
+                Expr::IntDiv(Box::new(left), Box::new(right))
             }
             9 => {
                 // Rem
-                let left = Box::new(self.generate_expr());
-                let right = Box::new(self.generate_expr());
-                Expr::Rem(left, right)
+                let left = self.generate_expr(depth + 1);
+                let right = self.generate_expr(depth + 1);
+
+                if matches!(left, Expr::Nop) || matches!(right, Expr::Nop) {
+                    return Expr::Nop;
+                }
+
+                Expr::Rem(Box::new(left), Box::new(right))
             }
             10 | 11 => {
                 // Assign
-                self.generate_assign()
+                self.generate_assign(depth + 1)
             }
             /*11 => {
                 // ArrayAssign
@@ -212,7 +260,7 @@ impl Mutator {
                     .collect();
 
                 if let Some(var_id) = self.rng.rand_vec(&vars) {
-                    let val = Box::new(self.generate_expr());
+                    let val = Box::new(self.generate_expr(depth + 1));
                     Expr::Constraint(var_id.clone(), val)
                 } else {
                     Expr::Nop
@@ -220,83 +268,151 @@ impl Mutator {
             }
             13 => {
                 // LessThan
-                let left = Box::new(self.generate_expr());
-                let right = Box::new(self.generate_expr());
-                Expr::LessThan(left, right)
+                let left = self.generate_expr(depth + 1);
+                let right = self.generate_expr(depth + 1);
+
+                if matches!(left, Expr::Nop) || matches!(right, Expr::Nop) {
+                    return Expr::Nop;
+                }
+
+                Expr::LessThan(Box::new(left), Box::new(right))
             }
             14 => {
                 // LessThanEq
-                let left = Box::new(self.generate_expr());
-                let right = Box::new(self.generate_expr());
-                Expr::LessThanEq(left, right)
+                let left = self.generate_expr(depth + 1);
+                let right = self.generate_expr(depth + 1);
+
+                if matches!(left, Expr::Nop) || matches!(right, Expr::Nop) {
+                    return Expr::Nop;
+                }
+
+                Expr::LessThanEq(Box::new(left), Box::new(right))
             }
             15 => {
                 // GreaterThan
-                let left = Box::new(self.generate_expr());
-                let right = Box::new(self.generate_expr());
-                Expr::GreaterThan(left, right)
+                let left = self.generate_expr(depth + 1);
+                let right = self.generate_expr(depth + 1);
+
+                if matches!(left, Expr::Nop) || matches!(right, Expr::Nop) {
+                    return Expr::Nop;
+                }
+
+                Expr::GreaterThan(Box::new(left), Box::new(right))
             }
             16 => {
                 // GreaterThanEq
-                let left = Box::new(self.generate_expr());
-                let right = Box::new(self.generate_expr());
-                Expr::GreaterThanEq(left, right)
+                let left = self.generate_expr(depth + 1);
+                let right = self.generate_expr(depth + 1);
+
+                if matches!(left, Expr::Nop) || matches!(right, Expr::Nop) {
+                    return Expr::Nop;
+                }
+
+                Expr::GreaterThanEq(Box::new(left), Box::new(right))
             }
             17 => {
                 // Equal
-                let left = Box::new(self.generate_expr());
-                let right = Box::new(self.generate_expr());
-                Expr::Equal(left, right)
+                let left = self.generate_expr(depth + 1);
+                let right = self.generate_expr(depth + 1);
+
+                if matches!(left, Expr::Nop) || matches!(right, Expr::Nop) {
+                    return Expr::Nop;
+                }
+
+                Expr::Equal(Box::new(left), Box::new(right))
             }
             18 => {
                 // And
-                let left = Box::new(self.generate_expr());
-                let right = Box::new(self.generate_expr());
-                Expr::And(left, right)
+                let left = self.generate_expr(depth + 1);
+                let right = self.generate_expr(depth + 1);
+
+                if matches!(left, Expr::Nop) || matches!(right, Expr::Nop) {
+                    return Expr::Nop;
+                }
+
+                Expr::And(Box::new(left), Box::new(right))
             }
             19 => {
                 // Or
-                let left = Box::new(self.generate_expr());
-                let right = Box::new(self.generate_expr());
-                Expr::Or(left, right)
+                let left = self.generate_expr(depth + 1);
+                let right = self.generate_expr(depth + 1);
+
+                if matches!(left, Expr::Nop) || matches!(right, Expr::Nop) {
+                    return Expr::Nop;
+                }
+
+                Expr::Or(Box::new(left), Box::new(right))
             }
             20 => {
                 // Not
-                Expr::Not(Box::new(self.generate_expr()))
+                let expr = self.generate_expr(depth + 1);
+                if matches!(expr, Expr::Nop) {
+                    return Expr::Nop;
+                }
+                Expr::Not(Box::new(expr))
             }
             21 => {
                 // BitAnd
-                let left = Box::new(self.generate_expr());
-                let right = Box::new(self.generate_expr());
-                Expr::BitAnd(left, right)
+                let left = self.generate_expr(depth + 1);
+                let right = self.generate_expr(depth + 1);
+
+                if matches!(left, Expr::Nop) || matches!(right, Expr::Nop) {
+                    return Expr::Nop;
+                }
+
+                Expr::BitAnd(Box::new(left), Box::new(right))
             }
             22 => {
                 // BitOr
-                let left = Box::new(self.generate_expr());
-                let right = Box::new(self.generate_expr());
-                Expr::BitOr(left, right)
+                let left = self.generate_expr(depth + 1);
+                let right = self.generate_expr(depth + 1);
+
+                if matches!(left, Expr::Nop) || matches!(right, Expr::Nop) {
+                    return Expr::Nop;
+                }
+
+                Expr::BitOr(Box::new(left), Box::new(right))
             }
             23 => {
                 // BitNot
-                Expr::BitNot(Box::new(self.generate_expr()))
+                let expr = self.generate_expr(depth + 1);
+                if matches!(expr, Expr::Nop) {
+                    return Expr::Nop;
+                }
+                Expr::BitNot(Box::new(expr))
             }
             24 => {
                 // BitXor
-                let left = Box::new(self.generate_expr());
-                let right = Box::new(self.generate_expr());
-                Expr::BitXor(left, right)
+                let left = self.generate_expr(depth + 1);
+                let right = self.generate_expr(depth + 1);
+
+                if matches!(left, Expr::Nop) || matches!(right, Expr::Nop) {
+                    return Expr::Nop;
+                }
+
+                Expr::BitXor(Box::new(left), Box::new(right))
             }
             25 => {
                 // BitRShift
-                let left = Box::new(self.generate_expr());
-                let right = Box::new(self.generate_expr());
-                Expr::BitRShift(left, right)
+                let left = self.generate_expr(depth + 1);
+                let right = self.generate_expr(depth + 1);
+
+                if matches!(left, Expr::Nop) || matches!(right, Expr::Nop) {
+                    return Expr::Nop;
+                }
+
+                Expr::BitRShift(Box::new(left), Box::new(right))
             }
             26 => {
                 // BitLShift
-                let left = Box::new(self.generate_expr());
-                let right = Box::new(self.generate_expr());
-                Expr::BitLShift(left, right)
+                let left = self.generate_expr(depth + 1);
+                let right = self.generate_expr(depth + 1);
+
+                if matches!(left, Expr::Nop) || matches!(right, Expr::Nop) {
+                    return Expr::Nop;
+                }
+
+                Expr::BitLShift(Box::new(left), Box::new(right))
             }
             27 => Expr::Nop,
             _ => unreachable!(),
@@ -341,7 +457,7 @@ impl Mutator {
         var
     }
 
-    fn generate_assign(&mut self) -> Expr {
+    fn generate_assign(&mut self, depth: usize) -> Expr {
         let vars: Vec<VarRef> = self
             .variables
             .iter()
@@ -353,11 +469,12 @@ impl Mutator {
             .collect();
 
         if let Some(var_id) = self.rng.rand_vec(&vars) {
-            let val = Box::new(self.generate_expr());
-            println!("{:?}", Expr::Assign(var_id.clone(), val.clone()));
-            Expr::Assign(var_id.clone(), val)
-        } else {
-            Expr::Nop
+            let val = self.generate_expr(depth + 1);
+            if !matches!(val, Expr::Nop) {
+                return Expr::Assign(var_id.clone(), Box::new(val));
+            }
         }
+
+        Expr::Nop
     }
 }
