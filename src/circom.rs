@@ -65,10 +65,16 @@ impl<'a> CircomTranspiler<'a> {
             ),
             Expr::Assign(varref, right) => {
                 let var = self.circuit.get_variable(varref);
+                println!("Expr::Assign {:?} {:?}", varref, right);
                 assert_eq!(
                     var.role,
                     VariableRole::Local,
-                    "Assignment is only possible with variables"
+                    "Assignment are only possible with variables"
+                );
+                assert_eq!(
+                    var.var_type,
+                    VariableType::Field,
+                    "Assignment are only possible with fields"
                 );
 
                 format!("{}={}", var.name, self.transpile_expr(right))
@@ -184,6 +190,7 @@ impl<'a> CircomTranspiler<'a> {
                     self.transpile_expr(right)
                 )
             }
+            Expr::Nop => String::new(),
         }
     }
 
@@ -364,6 +371,7 @@ impl<'a> CircomTranspiler<'a> {
 
                 res
             }
+            Instruction::Nop => String::new(),
         }
     }
 

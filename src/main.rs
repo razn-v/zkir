@@ -2,11 +2,16 @@ use std::io::Write;
 
 mod ast;
 mod circom;
+mod mutator;
+mod rng;
 
 use crate::ast::*;
 use crate::circom::*;
+use crate::mutator::Mutator;
+use crate::rng::Rng;
 
 fn main() {
+    /*
     let circuit = Circuit::new(vec![
         Instruction::VarDecl(Variable {
             id: VarRef(0),
@@ -71,7 +76,11 @@ fn main() {
                 )),
             ],
         },
-    ]);
+    ]); */
+
+    let rng = Rng::new();
+    let mut mutator = Mutator::new(rng);
+    let circuit = mutator.generate();
 
     let mut circom_backend = CircomTranspiler::new(&circuit);
     let output = circom_backend.transpile_circuit();

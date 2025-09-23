@@ -5,7 +5,7 @@ pub struct VarRef(pub usize);
 
 pub type Field = String;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     Var(VarRef),
     Constant(Field),
@@ -39,9 +39,15 @@ pub enum Expr {
     BitXor(Box<Expr>, Box<Expr>),
     BitRShift(Box<Expr>, Box<Expr>),
     BitLShift(Box<Expr>, Box<Expr>),
+
+    Nop,
 }
 
-#[derive(Debug, Clone)]
+impl Expr {
+    pub const EXPR_COUNT: usize = 28;
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum VariableType {
     Field,
     Array(usize),
@@ -86,23 +92,20 @@ pub enum Instruction {
         cond: Expr,
         body: Vec<Instruction>,
     },
+    Nop,
+}
+
+impl Instruction {
+    pub const INSTRUCTION_COUNT: usize = 6;
 }
 
 pub struct Circuit {
-    variables: Vec<Variable>,
+    pub variables: Vec<Variable>,
     pub instructions: Vec<Instruction>,
 }
 
 impl Circuit {
-    pub fn new(instructions: Vec<Instruction>) -> Self {
-        let mut variables = Vec::new();
-
-        for instr in &instructions {
-            if let Instruction::VarDecl(var) = instr {
-                variables.push(var.clone());
-            }
-        }
-
+    pub fn new(variables: Vec<Variable>, instructions: Vec<Instruction>) -> Self {
         Self {
             variables,
             instructions,
