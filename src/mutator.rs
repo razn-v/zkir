@@ -94,6 +94,10 @@ impl Mutator {
                     }
                 }
 
+                if then_branch.is_empty() {
+                    return None;
+                }
+
                 let mut else_branch: Option<Vec<Instruction>> = None;
                 // Add an else branch half of the time
                 if self.rng.rand(0, 1) == 0 {
@@ -104,7 +108,9 @@ impl Mutator {
                             instrs.push(instr);
                         }
                     }
-                    else_branch = Some(instrs);
+                    if !instrs.is_empty() {
+                        else_branch = Some(instrs);
+                    }
                 }
 
                 Some(Instruction::If {
