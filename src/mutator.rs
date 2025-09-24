@@ -252,6 +252,12 @@ impl Mutator {
             }*/
             12 => {
                 // Constraint
+
+                // Prevent putting constraints inside other expressions
+                if depth != 0 {
+                    return None;
+                }
+
                 let vars: Vec<VarRef> = self
                     .variables
                     .iter()
