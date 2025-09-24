@@ -1,3 +1,5 @@
+#![feature(variant_count)]
+
 use std::io::Write;
 
 mod ast;

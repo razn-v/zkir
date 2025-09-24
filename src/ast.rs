@@ -39,12 +39,10 @@ pub enum Expr {
     BitXor(Box<Expr>, Box<Expr>),
     BitRShift(Box<Expr>, Box<Expr>),
     BitLShift(Box<Expr>, Box<Expr>),
-
-    Nop,
 }
 
 impl Expr {
-    pub const EXPR_COUNT: usize = 28;
+    pub const EXPR_COUNT: usize = std::mem::variant_count::<Expr>();
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -92,11 +90,10 @@ pub enum Instruction {
         cond: Expr,
         body: Vec<Instruction>,
     },
-    Nop,
 }
 
 impl Instruction {
-    pub const INSTRUCTION_COUNT: usize = 6;
+    pub const INSTRUCTION_COUNT: usize = std::mem::variant_count::<Instruction>();
 }
 
 pub struct Circuit {

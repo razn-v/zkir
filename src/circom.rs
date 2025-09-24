@@ -190,7 +190,6 @@ impl<'a> CircomTranspiler<'a> {
                     self.transpile_expr(right)
                 )
             }
-            Expr::Nop => String::new(),
         }
     }
 
@@ -371,7 +370,6 @@ impl<'a> CircomTranspiler<'a> {
 
                 res
             }
-            Instruction::Nop => String::new(),
         }
     }
 
