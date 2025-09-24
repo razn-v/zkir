@@ -192,15 +192,27 @@ impl Mutator {
             return None;
         }*/
 
+        // 1/3 chance of returning a random constant
         if depth != 0 && self.rng.rand(1, 3) == 1 {
             return Some(Expr::Constant(self.rng.next().to_string()));
         }
 
-        if depth != 0 && self.rng.rand(1, 3) == 1 && !self.variables.is_empty() {
-            let varref = self.rng.rand(0, self.curr_var_id.unwrap());
-            return Some(Expr::Var(VarRef(varref)));
+        // 1/3 chance of picking up a random field variable
+        if depth != 0 && self.rng.rand(1, 3) == 1 {
+            let vars: Vec<VarRef> = self
+                .variables
+                .iter()
+                .filter(|var| matches!(var.var_type, VariableType::Field))
+                .map(|var| var.id.clone())
+                .collect();
+
+            let varref = self.rng.rand_vec(&vars);
+            if let Some(varref) = varref {
+                return Some(Expr::Var(varref.clone()));
+            }
         }
 
+        // 1/5 chance of stopping here
         if self.rng.rand(1, 5) == 1 {
             return None;
         }
@@ -263,14 +275,15 @@ impl Mutator {
             17 => gen_bin_expr!(self, depth, Expr::Equal),
             18 => gen_bin_expr!(self, depth, Expr::And),
             19 => gen_bin_expr!(self, depth, Expr::Or),
-            20 => gen_un_expr!(self, depth, Expr::Not),
+            // Broken on Circom for some reason
+            //20 => gen_un_expr!(self, depth, Expr::Not),
             21 => gen_bin_expr!(self, depth, Expr::BitAnd),
             22 => gen_bin_expr!(self, depth, Expr::BitOr),
             23 => gen_un_expr!(self, depth, Expr::BitNot),
             24 => gen_bin_expr!(self, depth, Expr::BitXor),
             25 => gen_bin_expr!(self, depth, Expr::BitRShift),
             26 => gen_bin_expr!(self, depth, Expr::BitLShift),
-            _ => unreachable!(),
+            _ => None,
         }
     }
 
