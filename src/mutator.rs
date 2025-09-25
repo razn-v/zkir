@@ -133,7 +133,34 @@ impl Mutator {
             }
             2 => {
                 // ArrayAssign
-                // TODO
+                let vars: Vec<(VarRef, usize)> = self
+                    .scope_stack
+                    .get_scope_vars()
+                    .into_iter()
+                    .filter_map(|var| {
+                        if matches!(var.role, VariableRole::Local) {
+                            if let VariableType::Array(n) = var.var_type {
+                                return Some((var.id.clone(), n));
+                            }
+                        }
+                        None
+                    })
+                    .collect();
+
+                if let Some((varref, n)) = self.rng.rand_vec(&vars) {
+                    let expr = self.generate_expr(0);
+
+                    if let Some(expr) = expr {
+                        let idx = self.rng.rand(0, n - 1);
+
+                        return Some(Instruction::ArrayAssign(
+                            varref.clone(),
+                            Box::new(Expr::Constant(idx.to_string())),
+                            Box::new(expr),
+                        ));
+                    }
+                }
+
                 None
             }
             3 => {
@@ -321,9 +348,35 @@ impl Mutator {
                     None
                 }
             }
-            1 | 2 => {
+            1 => {
                 // Constant
                 Some(Expr::Constant(self.rng.next().to_string()))
+            }
+            2 => {
+                // ArrayIndex
+                let vars: Vec<(VarRef, usize)> = self
+                    .scope_stack
+                    .get_scope_vars()
+                    .iter()
+                    .filter_map(|var| {
+                        if let VariableType::Array(n) = var.var_type {
+                            Some((var.id.clone(), n))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                if let Some((varref, n)) = self.rng.rand_vec(&vars) {
+                    let idx = self.rng.rand(0, n - 1);
+
+                    Some(Expr::ArrayIndex(
+                        varref.clone(),
+                        Box::new(Expr::Constant(idx.to_string())),
+                    ))
+                } else {
+                    None
+                }
             }
             3 => gen_bin_expr!(self, depth, Expr::Add),
             4 => gen_bin_expr!(self, depth, Expr::Sub),
