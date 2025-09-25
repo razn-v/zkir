@@ -19,10 +19,6 @@ pub enum Expr {
     IntDiv(Box<Expr>, Box<Expr>),
     Rem(Box<Expr>, Box<Expr>),
 
-    Assign(VarRef, Box<Expr>),
-    ArrayAssign(VarRef, Box<Expr>, Box<Expr>),
-    Constraint(VarRef, Box<Expr>),
-
     LessThan(Box<Expr>, Box<Expr>),
     LessThanEq(Box<Expr>, Box<Expr>),
     GreaterThan(Box<Expr>, Box<Expr>),
@@ -73,17 +69,19 @@ pub struct Variable {
 
 #[derive(Clone)]
 pub enum Instruction {
-    ExprStmt(Expr),
     VarDecl(Variable),
+    Assign(VarRef, Box<Expr>),
+    ArrayAssign(VarRef, Box<Expr>, Box<Expr>),
+    Constraint(VarRef, Box<Expr>),
     If {
         cond: Expr,
         then_branch: Vec<Instruction>,
         else_branch: Option<Vec<Instruction>>,
     },
     For {
-        init: Expr,
+        init: Box<Instruction>,
         cond: Expr,
-        step: Expr,
+        step: Box<Instruction>,
         body: Vec<Instruction>,
     },
     While {

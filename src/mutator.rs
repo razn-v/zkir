@@ -67,19 +67,37 @@ impl Mutator {
         let instr: Option<Instruction> = match self.rng.rand(0, Instruction::INSTRUCTION_COUNT - 1)
         {
             0 => {
-                // ExprStmt
-                let expr = self.generate_expr(0);
-                if let Some(expr) = expr {
-                    Some(Instruction::ExprStmt(expr))
-                } else {
-                    None
-                }
-            }
-            1 => {
                 // VarDecl
                 Some(Instruction::VarDecl(self.generate_var()))
             }
+            1 => {
+                // Assign
+                self.generate_assign()
+            }
             2 => {
+                // ArrayAssign
+                // TODO
+                None
+            }
+            3 => {
+                // Constraint
+                let vars: Vec<VarRef> = self
+                    .variables
+                    .iter()
+                    .filter(|var| matches!(var.role, VariableRole::Signal(SignalType::Output)))
+                    .map(|var| var.id.clone())
+                    .collect();
+
+                if let Some(var_id) = self.rng.rand_vec(&vars) {
+                    let expr = self.generate_expr(0);
+                    if let Some(expr) = expr {
+                        return Some(Instruction::Constraint(var_id.clone(), Box::new(expr)));
+                    }
+                }
+
+                None
+            }
+            4 => {
                 // If
                 let cond = self.generate_expr(0);
                 if cond.is_none() {
@@ -119,10 +137,10 @@ impl Mutator {
                     else_branch: else_branch,
                 })
             }
-            3 => {
+            5 => {
                 // For
-                let init = if let Some(Expr::Assign(varr, expr)) = self.generate_assign(0) {
-                    Expr::Assign(varr, expr)
+                let init = if let Some(Instruction::Assign(varr, expr)) = self.generate_assign() {
+                    Instruction::Assign(varr, expr)
                 } else {
                     return None;
                 };
@@ -132,8 +150,8 @@ impl Mutator {
                     return None;
                 }
 
-                let step = if let Some(Expr::Assign(varr, expr)) = self.generate_assign(0) {
-                    Expr::Assign(varr, expr)
+                let step = if let Some(Instruction::Assign(varr, expr)) = self.generate_assign() {
+                    Instruction::Assign(varr, expr)
                 } else {
                     return None;
                 };
@@ -151,13 +169,13 @@ impl Mutator {
                 }
 
                 Some(Instruction::For {
-                    init: init,
+                    init: Box::new(init),
                     cond: cond.unwrap(),
-                    step: step,
+                    step: Box::new(step),
                     body: body,
                 })
             }
-            4 => {
+            6 => {
                 // While
                 let cond = self.generate_expr(0);
                 if cond.is_none() {
@@ -181,7 +199,7 @@ impl Mutator {
                     body: body,
                 })
             }
-            _ => unreachable!(),
+            _ => None,
         };
 
         instr
@@ -231,10 +249,6 @@ impl Mutator {
                 // Constant
                 Some(Expr::Constant(self.rng.next().to_string()))
             }
-            /*2 => {
-                // ArrayIndex
-                todo!();
-            }*/
             3 => gen_bin_expr!(self, depth, Expr::Add),
             4 => gen_bin_expr!(self, depth, Expr::Sub),
             5 => gen_bin_expr!(self, depth, Expr::Mul),
@@ -242,53 +256,21 @@ impl Mutator {
             7 => gen_bin_expr!(self, depth, Expr::Div),
             8 => gen_bin_expr!(self, depth, Expr::IntDiv),
             9 => gen_bin_expr!(self, depth, Expr::Rem),
-            10 | 11 => {
-                // Assign
-                self.generate_assign(depth + 1)
-            }
-            /*11 => {
-                // ArrayAssign
-                //todo!();
-            }*/
-            12 => {
-                // Constraint
-
-                // Prevent putting constraints inside other expressions
-                if depth != 0 {
-                    return None;
-                }
-
-                let vars: Vec<VarRef> = self
-                    .variables
-                    .iter()
-                    .filter(|var| matches!(var.role, VariableRole::Signal(SignalType::Output)))
-                    .map(|var| var.id.clone())
-                    .collect();
-
-                if let Some(var_id) = self.rng.rand_vec(&vars) {
-                    let expr = self.generate_expr(depth + 1);
-                    if let Some(expr) = expr {
-                        return Some(Expr::Constraint(var_id.clone(), Box::new(expr)));
-                    }
-                }
-
-                None
-            }
-            13 => gen_bin_expr!(self, depth, Expr::LessThan),
-            14 => gen_bin_expr!(self, depth, Expr::LessThanEq),
-            15 => gen_bin_expr!(self, depth, Expr::GreaterThan),
-            16 => gen_bin_expr!(self, depth, Expr::GreaterThanEq),
-            17 => gen_bin_expr!(self, depth, Expr::Equal),
-            18 => gen_bin_expr!(self, depth, Expr::And),
-            19 => gen_bin_expr!(self, depth, Expr::Or),
+            10 => gen_bin_expr!(self, depth, Expr::LessThan),
+            11 => gen_bin_expr!(self, depth, Expr::LessThanEq),
+            12 => gen_bin_expr!(self, depth, Expr::GreaterThan),
+            13 => gen_bin_expr!(self, depth, Expr::GreaterThanEq),
+            14 => gen_bin_expr!(self, depth, Expr::Equal),
+            15 => gen_bin_expr!(self, depth, Expr::And),
+            16 => gen_bin_expr!(self, depth, Expr::Or),
             // Broken on Circom for some reason
-            //20 => gen_un_expr!(self, depth, Expr::Not),
-            21 => gen_bin_expr!(self, depth, Expr::BitAnd),
-            22 => gen_bin_expr!(self, depth, Expr::BitOr),
-            23 => gen_un_expr!(self, depth, Expr::BitNot),
-            24 => gen_bin_expr!(self, depth, Expr::BitXor),
-            25 => gen_bin_expr!(self, depth, Expr::BitRShift),
-            26 => gen_bin_expr!(self, depth, Expr::BitLShift),
+            //17 => gen_un_expr!(self, depth, Expr::Not),
+            18 => gen_bin_expr!(self, depth, Expr::BitAnd),
+            19 => gen_bin_expr!(self, depth, Expr::BitOr),
+            20 => gen_un_expr!(self, depth, Expr::BitNot),
+            21 => gen_bin_expr!(self, depth, Expr::BitXor),
+            22 => gen_bin_expr!(self, depth, Expr::BitRShift),
+            23 => gen_bin_expr!(self, depth, Expr::BitLShift),
             _ => None,
         }
     }
@@ -330,7 +312,7 @@ impl Mutator {
         var
     }
 
-    fn generate_assign(&mut self, depth: usize) -> Option<Expr> {
+    fn generate_assign(&mut self) -> Option<Instruction> {
         let vars: Vec<VarRef> = self
             .variables
             .iter()
@@ -342,9 +324,9 @@ impl Mutator {
             .collect();
 
         if let Some(var_id) = self.rng.rand_vec(&vars) {
-            let expr = self.generate_expr(depth + 1);
+            let expr = self.generate_expr(0);
             if let Some(expr) = expr {
-                return Some(Expr::Assign(var_id.clone(), Box::new(expr)));
+                return Some(Instruction::Assign(var_id.clone(), Box::new(expr)));
             }
         }
 
