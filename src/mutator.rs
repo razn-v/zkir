@@ -29,7 +29,6 @@ macro_rules! gen_un_expr {
 
 pub struct Mutator {
     rng: Rng,
-    curr_var_id: Option<usize>,
     n_instr: usize,
     variables: Vec<Variable>,
 }
@@ -38,7 +37,6 @@ impl Mutator {
     pub fn new(rng: Rng) -> Self {
         Self {
             rng,
-            curr_var_id: None,
             n_instr: 0,
             variables: Vec::new(),
         }
@@ -238,9 +236,9 @@ impl Mutator {
         match self.rng.rand(1, Expr::EXPR_COUNT - 1) {
             0 => {
                 // Var
-                if let Some(varid) = self.curr_var_id {
-                    let varref = self.rng.rand(0, varid);
-                    Some(Expr::Var(VarRef(varref)))
+                let varref = self.rng.rand_vec(&self.variables);
+                if let Some(varref) = varref {
+                    Some(Expr::Var(varref.id.clone()))
                 } else {
                     None
                 }
@@ -294,14 +292,8 @@ impl Mutator {
             role = VariableRole::Local;
         }
 
-        if self.curr_var_id.is_none() {
-            self.curr_var_id = Some(0);
-        } else {
-            *self.curr_var_id.as_mut().unwrap() += 1;
-        }
-
         let var = Variable {
-            id: VarRef(self.curr_var_id.unwrap()),
+            id: VarRef(self.variables.len()),
             name: self.rng.rand_string(8),
             var_type,
             role,
