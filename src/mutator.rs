@@ -27,10 +27,64 @@ macro_rules! gen_un_expr {
     }};
 }
 
+struct Scope {
+    vars: Vec<Variable>,
+}
+
+impl Scope {
+    fn new() -> Self {
+        Self { vars: Vec::new() }
+    }
+}
+
+struct ScopeStack {
+    stack: Vec<Scope>,
+    all_vars: Vec<Variable>,
+    next_id: usize,
+}
+
+impl ScopeStack {
+    fn new() -> Self {
+        Self {
+            stack: vec![],
+            all_vars: Vec::new(),
+            next_id: 0,
+        }
+    }
+
+    fn enter_scope(&mut self) {
+        self.stack.push(Scope::new());
+    }
+
+    fn leave_scope(&mut self) {
+        self.stack.pop();
+    }
+
+    fn add_var(&mut self, name: String, var_type: VariableType, role: VariableRole) -> Variable {
+        let var = Variable {
+            id: VarRef(self.next_id),
+            name: name,
+            var_type: var_type,
+            role: role,
+        };
+
+        self.stack.last_mut().unwrap().vars.push(var.clone());
+        self.all_vars.push(var.clone());
+        self.next_id += 1;
+
+        var
+    }
+
+    // Return all variables within reach inside the current scope
+    fn get_scope_vars(&self) -> Vec<&Variable> {
+        self.stack.iter().flat_map(|s| &s.vars).collect()
+    }
+}
+
 pub struct Mutator {
     rng: Rng,
     n_instr: usize,
-    variables: Vec<Variable>,
+    scope_stack: ScopeStack,
 }
 
 impl Mutator {
@@ -38,12 +92,14 @@ impl Mutator {
         Self {
             rng,
             n_instr: 0,
-            variables: Vec::new(),
+            scope_stack: ScopeStack::new(),
         }
     }
 
     pub fn generate(&mut self) -> Circuit {
         let mut instructions = Vec::new();
+
+        self.scope_stack.enter_scope();
 
         for _ in 1..self.rng.rand(15, 30) {
             let instr = self.generate_instr();
@@ -52,7 +108,10 @@ impl Mutator {
             }
         }
 
-        Circuit::new(self.variables.clone(), instructions)
+        self.scope_stack.leave_scope();
+        assert!(self.scope_stack.stack.is_empty());
+
+        Circuit::new(self.scope_stack.all_vars.clone(), instructions)
     }
 
     pub fn generate_instr(&mut self) -> Option<Instruction> {
@@ -80,7 +139,8 @@ impl Mutator {
             3 => {
                 // Constraint
                 let vars: Vec<VarRef> = self
-                    .variables
+                    .scope_stack
+                    .get_scope_vars()
                     .iter()
                     .filter(|var| matches!(var.role, VariableRole::Signal(SignalType::Output)))
                     .map(|var| var.id.clone())
@@ -102,6 +162,8 @@ impl Mutator {
                     return None;
                 }
 
+                self.scope_stack.enter_scope();
+
                 let mut then_branch = Vec::<Instruction>::new();
                 for _ in 1..self.rng.rand(1, 5) {
                     let instr = self.generate_instr();
@@ -110,9 +172,13 @@ impl Mutator {
                     }
                 }
 
+                self.scope_stack.leave_scope();
+
                 if then_branch.is_empty() {
                     return None;
                 }
+
+                self.scope_stack.enter_scope();
 
                 let mut else_branch: Option<Vec<Instruction>> = None;
                 // Add an else branch half of the time
@@ -128,6 +194,8 @@ impl Mutator {
                         else_branch = Some(instrs);
                     }
                 }
+
+                self.scope_stack.leave_scope();
 
                 Some(Instruction::If {
                     cond: cond.unwrap(),
@@ -154,6 +222,8 @@ impl Mutator {
                     return None;
                 };
 
+                self.scope_stack.enter_scope();
+
                 let mut body = Vec::<Instruction>::new();
                 for _ in 1..self.rng.rand(1, 5) {
                     let instr = self.generate_instr();
@@ -161,6 +231,8 @@ impl Mutator {
                         body.push(instr);
                     }
                 }
+
+                self.scope_stack.leave_scope();
 
                 if body.is_empty() {
                     return None;
@@ -180,6 +252,8 @@ impl Mutator {
                     return None;
                 }
 
+                self.scope_stack.enter_scope();
+
                 let mut body = Vec::<Instruction>::new();
                 for _ in 1..self.rng.rand(1, 5) {
                     let instr = self.generate_instr();
@@ -187,6 +261,8 @@ impl Mutator {
                         body.push(instr);
                     }
                 }
+
+                self.scope_stack.leave_scope();
 
                 if body.is_empty() {
                     return None;
@@ -216,7 +292,8 @@ impl Mutator {
         // 1/3 chance of picking up a random field variable
         if depth != 0 && self.rng.rand(1, 3) == 1 {
             let vars: Vec<VarRef> = self
-                .variables
+                .scope_stack
+                .get_scope_vars()
                 .iter()
                 .filter(|var| matches!(var.var_type, VariableType::Field))
                 .map(|var| var.id.clone())
@@ -236,7 +313,8 @@ impl Mutator {
         match self.rng.rand(1, Expr::EXPR_COUNT - 1) {
             0 => {
                 // Var
-                let varref = self.rng.rand_vec(&self.variables);
+                let vars = self.scope_stack.get_scope_vars();
+                let varref = self.rng.rand_vec(&vars);
                 if let Some(varref) = varref {
                     Some(Expr::Var(varref.id.clone()))
                 } else {
@@ -292,21 +370,14 @@ impl Mutator {
             role = VariableRole::Local;
         }
 
-        let var = Variable {
-            id: VarRef(self.variables.len()),
-            name: self.rng.rand_string(8),
-            var_type,
-            role,
-        };
-
-        self.variables.push(var.clone());
-
-        var
+        self.scope_stack
+            .add_var(self.rng.rand_string(8), var_type, role)
     }
 
     fn generate_assign(&mut self) -> Option<Instruction> {
         let vars: Vec<VarRef> = self
-            .variables
+            .scope_stack
+            .get_scope_vars()
             .iter()
             .filter(|var| {
                 matches!(var.role, VariableRole::Local)
