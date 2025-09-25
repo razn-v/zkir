@@ -24,42 +24,42 @@ impl<'a> CircomTranspiler<'a> {
             Expr::Constant(field) => field.to_string(),
             Expr::ArrayIndex(varref, expr) => {
                 let var = self.circuit.get_variable(varref);
-                format!("{}[{}]", var.name, self.transpile_expr(expr))
+                format!("({}[{}])", var.name, self.transpile_expr(expr))
             }
             Expr::Add(left, right) => {
                 format!(
-                    "{}+{}",
+                    "({}+{})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
             }
             Expr::Sub(left, right) => format!(
-                "{}-{}",
+                "({}-{})",
                 self.transpile_expr(left),
                 self.transpile_expr(right)
             ),
             Expr::Mul(left, right) => format!(
-                "{}*{}",
+                "({}*{})",
                 self.transpile_expr(left),
                 self.transpile_expr(right)
             ),
             Expr::Power(left, right) => format!(
-                "{}**{}",
+                "({}**{})",
                 self.transpile_expr(left),
                 self.transpile_expr(right)
             ),
             Expr::Div(left, right) => format!(
-                "{}/{}",
+                "({}/{})",
                 self.transpile_expr(left),
                 self.transpile_expr(right)
             ),
             Expr::IntDiv(left, right) => format!(
-                "{}\\{}",
+                "({}\\{})",
                 self.transpile_expr(left),
                 self.transpile_expr(right)
             ),
             Expr::Rem(left, right) => format!(
-                "{}%{}",
+                "({}%{})",
                 self.transpile_expr(left),
                 self.transpile_expr(right)
             ),
@@ -106,86 +106,86 @@ impl<'a> CircomTranspiler<'a> {
             }
             Expr::LessThan(left, right) => {
                 format!(
-                    "{}<{}",
+                    "({}<{})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
             }
             Expr::LessThanEq(left, right) => {
                 format!(
-                    "{}<={}",
+                    "({}<={})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
             }
             Expr::GreaterThan(left, right) => {
                 format!(
-                    "{}>{}",
+                    "({}>{})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
             }
             Expr::GreaterThanEq(left, right) => {
                 format!(
-                    "{}>={}",
+                    "({}>={})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
             }
             Expr::Equal(left, right) => {
                 format!(
-                    "{}=={}",
+                    "({}=={})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
             }
             Expr::And(left, right) => {
                 format!(
-                    "{}&&{}",
+                    "({}&&{})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
             }
             Expr::Or(left, right) => {
                 format!(
-                    "{}||{}",
+                    "({}||{})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
             }
-            Expr::Not(expr) => format!("!{}", self.transpile_expr(expr)),
+            Expr::Not(expr) => format!("(!{})", self.transpile_expr(expr)),
             Expr::BitAnd(left, right) => {
                 format!(
-                    "{}&{}",
+                    "({}&{})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
             }
             Expr::BitOr(left, right) => {
                 format!(
-                    "{}|{}",
+                    "({}|{})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
             }
-            Expr::BitNot(expr) => format!("~{}", self.transpile_expr(expr)),
+            Expr::BitNot(expr) => format!("(~{})", self.transpile_expr(expr)),
             Expr::BitXor(left, right) => {
                 format!(
-                    "{}^{}",
+                    "({}^{})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
             }
             Expr::BitRShift(left, right) => {
                 format!(
-                    "{}>>{}",
+                    "({}>>{})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
             }
             Expr::BitLShift(left, right) => {
                 format!(
-                    "{}<<{}",
+                    "({}<<{})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
