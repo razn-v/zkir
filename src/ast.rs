@@ -65,6 +65,7 @@ pub struct Variable {
     pub name: String,
     pub var_type: VariableType,
     pub role: VariableRole,
+    pub initialized: bool,
 }
 
 #[derive(Clone)]

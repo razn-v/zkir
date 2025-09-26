@@ -4,9 +4,9 @@ use crate::{
 };
 
 macro_rules! gen_bin_expr {
-    ($self:ident, $depth:ident, $op:path) => {{
-        let left = $self.generate_expr($depth + 1);
-        let right = $self.generate_expr($depth + 1);
+    ($self:ident, $depth:ident, $op:path, $only_initialized_vars:ident) => {{
+        let left = $self.generate_expr($depth + 1, $only_initialized_vars);
+        let right = $self.generate_expr($depth + 1, $only_initialized_vars);
 
         if left.is_none() || right.is_none() {
             return None;
@@ -17,8 +17,8 @@ macro_rules! gen_bin_expr {
 }
 
 macro_rules! gen_un_expr {
-    ($self:ident, $depth:ident, $op:path) => {{
-        let expr = $self.generate_expr($depth + 1);
+    ($self:ident, $depth:ident, $op:path, $only_initialized_vars:ident) => {{
+        let expr = $self.generate_expr($depth + 1, $only_initialized_vars);
         if expr.is_none() {
             return None;
         }
@@ -66,6 +66,7 @@ impl ScopeStack {
             name: name,
             var_type: var_type,
             role: role,
+            initialized: false,
         };
 
         self.stack.last_mut().unwrap().vars.push(var.clone());
@@ -78,6 +79,17 @@ impl ScopeStack {
     // Return all variables within reach inside the current scope
     fn get_scope_vars(&self) -> Vec<&Variable> {
         self.stack.iter().flat_map(|s| &s.vars).collect()
+    }
+
+    fn mark_initialized(&mut self, var_id: &VarRef) {
+        for scope in &mut self.stack {
+            for var in &mut scope.vars {
+                if var.id == *var_id {
+                    var.initialized = true;
+                    return;
+                }
+            }
+        }
     }
 }
 
@@ -129,7 +141,7 @@ impl Mutator {
             }
             1 => {
                 // Assign
-                self.generate_assign()
+                self.generate_assign(false)
             }
             2 => {
                 // ArrayAssign
@@ -148,7 +160,8 @@ impl Mutator {
                     .collect();
 
                 if let Some((varref, n)) = self.rng.rand_vec(&vars) {
-                    let expr = self.generate_expr(0);
+                    // We can only assign an array index to initialized variables
+                    let expr = self.generate_expr(0, true);
 
                     if let Some(expr) = expr {
                         let idx = self.rng.rand(0, n - 1);
@@ -174,7 +187,7 @@ impl Mutator {
                     .collect();
 
                 if let Some(var_id) = self.rng.rand_vec(&vars) {
-                    let expr = self.generate_expr(0);
+                    let expr = self.generate_expr(0, false);
                     if let Some(expr) = expr {
                         return Some(Instruction::Constraint(var_id.clone(), Box::new(expr)));
                     }
@@ -184,7 +197,7 @@ impl Mutator {
             }
             4 => {
                 // If
-                let cond = self.generate_expr(0);
+                let cond = self.generate_expr(0, true);
                 if cond.is_none() {
                     return None;
                 }
@@ -202,6 +215,7 @@ impl Mutator {
                 self.scope_stack.leave_scope();
 
                 if then_branch.is_empty() {
+                    println!("No then_branch found for IF");
                     return None;
                 }
 
@@ -232,22 +246,24 @@ impl Mutator {
             }
             5 => {
                 // For
-                let init = if let Some(Instruction::Assign(varr, expr)) = self.generate_assign() {
-                    Instruction::Assign(varr, expr)
-                } else {
-                    return None;
-                };
+                let init =
+                    if let Some(Instruction::Assign(varr, expr)) = self.generate_assign(false) {
+                        Instruction::Assign(varr, expr)
+                    } else {
+                        return None;
+                    };
 
-                let cond = self.generate_expr(0);
+                let cond = self.generate_expr(0, true);
                 if cond.is_none() {
                     return None;
                 }
 
-                let step = if let Some(Instruction::Assign(varr, expr)) = self.generate_assign() {
-                    Instruction::Assign(varr, expr)
-                } else {
-                    return None;
-                };
+                let step =
+                    if let Some(Instruction::Assign(varr, expr)) = self.generate_assign(false) {
+                        Instruction::Assign(varr, expr)
+                    } else {
+                        return None;
+                    };
 
                 self.scope_stack.enter_scope();
 
@@ -274,7 +290,7 @@ impl Mutator {
             }
             6 => {
                 // While
-                let cond = self.generate_expr(0);
+                let cond = self.generate_expr(0, true);
                 if cond.is_none() {
                     return None;
                 }
@@ -306,30 +322,10 @@ impl Mutator {
         instr
     }
 
-    pub fn generate_expr(&mut self, depth: usize) -> Option<Expr> {
-        /*if depth >= 10 {
-            return None;
-        }*/
-
+    pub fn generate_expr(&mut self, depth: usize, only_initialized_vars: bool) -> Option<Expr> {
         // 1/3 chance of returning a random constant
         if depth != 0 && self.rng.rand(1, 3) == 1 {
             return Some(Expr::Constant(self.rng.next().to_string()));
-        }
-
-        // 1/3 chance of picking up a random field variable
-        if depth != 0 && self.rng.rand(1, 3) == 1 {
-            let vars: Vec<VarRef> = self
-                .scope_stack
-                .get_scope_vars()
-                .iter()
-                .filter(|var| matches!(var.var_type, VariableType::Field))
-                .map(|var| var.id.clone())
-                .collect();
-
-            let varref = self.rng.rand_vec(&vars);
-            if let Some(varref) = varref {
-                return Some(Expr::Var(varref.clone()));
-            }
         }
 
         // 1/5 chance of stopping here
@@ -340,10 +336,25 @@ impl Mutator {
         match self.rng.rand(1, Expr::EXPR_COUNT - 1) {
             0 => {
                 // Var
-                let vars = self.scope_stack.get_scope_vars();
+
+                // Only pick Field variables because Arrays can only be accessed with ArrayIndex expressions
+                let vars = self
+                    .scope_stack
+                    .get_scope_vars()
+                    .iter()
+                    .filter(|var| {
+                        if only_initialized_vars {
+                            matches!(var.var_type, VariableType::Field) && var.initialized
+                        } else {
+                            matches!(var.var_type, VariableType::Field)
+                        }
+                    })
+                    .map(|var| var.id.clone())
+                    .collect();
                 let varref = self.rng.rand_vec(&vars);
+
                 if let Some(varref) = varref {
-                    Some(Expr::Var(varref.id.clone()))
+                    Some(Expr::Var(varref.clone()))
                 } else {
                     None
                 }
@@ -360,6 +371,9 @@ impl Mutator {
                     .iter()
                     .filter_map(|var| {
                         if let VariableType::Array(n) = var.var_type {
+                            if only_initialized_vars && !var.initialized {
+                                return None;
+                            }
                             Some((var.id.clone(), n))
                         } else {
                             None
@@ -378,28 +392,28 @@ impl Mutator {
                     None
                 }
             }
-            3 => gen_bin_expr!(self, depth, Expr::Add),
-            4 => gen_bin_expr!(self, depth, Expr::Sub),
-            5 => gen_bin_expr!(self, depth, Expr::Mul),
-            6 => gen_bin_expr!(self, depth, Expr::Power),
-            7 => gen_bin_expr!(self, depth, Expr::Div),
-            8 => gen_bin_expr!(self, depth, Expr::IntDiv),
-            9 => gen_bin_expr!(self, depth, Expr::Rem),
-            10 => gen_bin_expr!(self, depth, Expr::LessThan),
-            11 => gen_bin_expr!(self, depth, Expr::LessThanEq),
-            12 => gen_bin_expr!(self, depth, Expr::GreaterThan),
-            13 => gen_bin_expr!(self, depth, Expr::GreaterThanEq),
-            14 => gen_bin_expr!(self, depth, Expr::Equal),
-            15 => gen_bin_expr!(self, depth, Expr::And),
-            16 => gen_bin_expr!(self, depth, Expr::Or),
+            3 => gen_bin_expr!(self, depth, Expr::Add, only_initialized_vars),
+            4 => gen_bin_expr!(self, depth, Expr::Sub, only_initialized_vars),
+            5 => gen_bin_expr!(self, depth, Expr::Mul, only_initialized_vars),
+            6 => gen_bin_expr!(self, depth, Expr::Power, only_initialized_vars),
+            7 => gen_bin_expr!(self, depth, Expr::Div, only_initialized_vars),
+            8 => gen_bin_expr!(self, depth, Expr::IntDiv, only_initialized_vars),
+            9 => gen_bin_expr!(self, depth, Expr::Rem, only_initialized_vars),
+            10 => gen_bin_expr!(self, depth, Expr::LessThan, only_initialized_vars),
+            11 => gen_bin_expr!(self, depth, Expr::LessThanEq, only_initialized_vars),
+            12 => gen_bin_expr!(self, depth, Expr::GreaterThan, only_initialized_vars),
+            13 => gen_bin_expr!(self, depth, Expr::GreaterThanEq, only_initialized_vars),
+            14 => gen_bin_expr!(self, depth, Expr::Equal, only_initialized_vars),
+            15 => gen_bin_expr!(self, depth, Expr::And, only_initialized_vars),
+            16 => gen_bin_expr!(self, depth, Expr::Or, only_initialized_vars),
             // Broken on Circom for some reason
-            //17 => gen_un_expr!(self, depth, Expr::Not),
-            18 => gen_bin_expr!(self, depth, Expr::BitAnd),
-            19 => gen_bin_expr!(self, depth, Expr::BitOr),
-            20 => gen_un_expr!(self, depth, Expr::BitNot),
-            21 => gen_bin_expr!(self, depth, Expr::BitXor),
-            22 => gen_bin_expr!(self, depth, Expr::BitRShift),
-            23 => gen_bin_expr!(self, depth, Expr::BitLShift),
+            //17 => gen_un_expr!(self, depth, Expr::Not, only_initialized_vars),
+            18 => gen_bin_expr!(self, depth, Expr::BitAnd, only_initialized_vars),
+            19 => gen_bin_expr!(self, depth, Expr::BitOr, only_initialized_vars),
+            20 => gen_un_expr!(self, depth, Expr::BitNot, only_initialized_vars),
+            21 => gen_bin_expr!(self, depth, Expr::BitXor, only_initialized_vars),
+            22 => gen_bin_expr!(self, depth, Expr::BitRShift, only_initialized_vars),
+            23 => gen_bin_expr!(self, depth, Expr::BitLShift, only_initialized_vars),
             _ => None,
         }
     }
@@ -427,25 +441,29 @@ impl Mutator {
             .add_var(self.rng.rand_string(8), var_type, role)
     }
 
-    fn generate_assign(&mut self) -> Option<Instruction> {
+    fn generate_assign(&mut self, only_initialized_vars: bool) -> Option<Instruction> {
         let vars: Vec<VarRef> = self
             .scope_stack
             .get_scope_vars()
             .iter()
             .filter(|var| {
+                if only_initialized_vars && !var.initialized {
+                    return false;
+                }
                 matches!(var.role, VariableRole::Local)
                     && matches!(var.var_type, VariableType::Field)
             })
             .map(|var| var.id.clone())
             .collect();
 
-        if let Some(var_id) = self.rng.rand_vec(&vars) {
-            let expr = self.generate_expr(0);
-            if let Some(expr) = expr {
-                return Some(Instruction::Assign(var_id.clone(), Box::new(expr)));
-            }
-        }
+        let var_id = self.rng.rand_vec(&vars)?.clone();
 
-        None
+        // We can only initialize variables to initialized variables
+        let expr = self.generate_expr(0, true)?;
+
+        // Mark variable as initialized
+        self.scope_stack.mark_initialized(&var_id);
+
+        Some(Instruction::Assign(var_id, Box::new(expr)))
     }
 }

@@ -156,7 +156,6 @@ impl<'a> CircomTranspiler<'a> {
         match instr {
             Instruction::Assign(varref, right) => {
                 let var = self.circuit.get_variable(varref);
-                println!("Expr::Assign {:?} {:?}", varref, right);
                 assert_eq!(
                     var.role,
                     VariableRole::Local,
