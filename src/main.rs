@@ -1,12 +1,19 @@
+#![feature(variant_count)]
+
 use std::io::Write;
 
 mod ast;
 mod circom;
+mod generator;
+mod rng;
 
 use crate::ast::*;
 use crate::circom::*;
+use crate::generator::Generator;
+use crate::rng::Rng;
 
 fn main() {
+    /*
     let circuit = Circuit::new(vec![
         Instruction::VarDecl(Variable {
             id: VarRef(0),
@@ -71,7 +78,11 @@ fn main() {
                 )),
             ],
         },
-    ]);
+    ]); */
+
+    let rng = Rng::new();
+    let mut generator = Generator::new(rng);
+    let circuit = generator.generate();
 
     let mut circom_backend = CircomTranspiler::new(&circuit);
     let output = circom_backend.transpile_circuit();

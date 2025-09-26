@@ -24,162 +24,127 @@ impl<'a> CircomTranspiler<'a> {
             Expr::Constant(field) => field.to_string(),
             Expr::ArrayIndex(varref, expr) => {
                 let var = self.circuit.get_variable(varref);
-                format!("{}[{}]", var.name, self.transpile_expr(expr))
+                format!("({}[{}])", var.name, self.transpile_expr(expr))
             }
             Expr::Add(left, right) => {
                 format!(
-                    "{}+{}",
+                    "({}+{})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
             }
             Expr::Sub(left, right) => format!(
-                "{}-{}",
+                "({}-{})",
                 self.transpile_expr(left),
                 self.transpile_expr(right)
             ),
             Expr::Mul(left, right) => format!(
-                "{}*{}",
+                "({}*{})",
                 self.transpile_expr(left),
                 self.transpile_expr(right)
             ),
             Expr::Power(left, right) => format!(
-                "{}**{}",
+                "({}**{})",
                 self.transpile_expr(left),
                 self.transpile_expr(right)
             ),
             Expr::Div(left, right) => format!(
-                "{}/{}",
+                "({}/{})",
                 self.transpile_expr(left),
                 self.transpile_expr(right)
             ),
             Expr::IntDiv(left, right) => format!(
-                "{}\\{}",
+                "({}\\{})",
                 self.transpile_expr(left),
                 self.transpile_expr(right)
             ),
             Expr::Rem(left, right) => format!(
-                "{}%{}",
+                "({}%{})",
                 self.transpile_expr(left),
                 self.transpile_expr(right)
             ),
-            Expr::Assign(varref, right) => {
-                let var = self.circuit.get_variable(varref);
-                assert_eq!(
-                    var.role,
-                    VariableRole::Local,
-                    "Assignment is only possible with variables"
-                );
-
-                format!("{}={}", var.name, self.transpile_expr(right))
-            }
-            Expr::ArrayAssign(varref, index, val) => {
-                let var = self.circuit.get_variable(varref);
-                assert_eq!(
-                    var.role,
-                    VariableRole::Local,
-                    "Assignment is only possible between variables"
-                );
-                assert!(matches!(var.var_type, VariableType::Array(_)));
-
-                format!(
-                    "{}[{}]={}",
-                    var.name,
-                    self.transpile_expr(index),
-                    self.transpile_expr(val)
-                )
-            }
-            Expr::Constraint(varref, right) => {
-                let var = self.circuit.get_variable(varref);
-                assert_eq!(
-                    var.role,
-                    VariableRole::Signal(SignalType::Output),
-                    "Constraint are only possible when the target is an output signal"
-                );
-                format!("{}<=={}", var.name, self.transpile_expr(right))
-            }
             Expr::LessThan(left, right) => {
                 format!(
-                    "{}<{}",
+                    "({}<{})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
             }
             Expr::LessThanEq(left, right) => {
                 format!(
-                    "{}<={}",
+                    "({}<={})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
             }
             Expr::GreaterThan(left, right) => {
                 format!(
-                    "{}>{}",
+                    "({}>{})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
             }
             Expr::GreaterThanEq(left, right) => {
                 format!(
-                    "{}>={}",
+                    "({}>={})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
             }
             Expr::Equal(left, right) => {
                 format!(
-                    "{}=={}",
+                    "({}=={})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
             }
             Expr::And(left, right) => {
                 format!(
-                    "{}&&{}",
+                    "({}&&{})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
             }
             Expr::Or(left, right) => {
                 format!(
-                    "{}||{}",
+                    "({}||{})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
             }
-            Expr::Not(expr) => format!("!{}", self.transpile_expr(expr)),
+            //Expr::Not(expr) => format!("(!{})", self.transpile_expr(expr)),
             Expr::BitAnd(left, right) => {
                 format!(
-                    "{}&{}",
+                    "({}&{})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
             }
             Expr::BitOr(left, right) => {
                 format!(
-                    "{}|{}",
+                    "({}|{})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
             }
-            Expr::BitNot(expr) => format!("~{}", self.transpile_expr(expr)),
+            Expr::BitNot(expr) => format!("(~{})", self.transpile_expr(expr)),
             Expr::BitXor(left, right) => {
                 format!(
-                    "{}^{}",
+                    "({}^{})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
             }
             Expr::BitRShift(left, right) => {
                 format!(
-                    "{}>>{}",
+                    "({}>>{})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
             }
             Expr::BitLShift(left, right) => {
                 format!(
-                    "{}<<{}",
+                    "({}<<{})",
                     self.transpile_expr(left),
                     self.transpile_expr(right)
                 )
@@ -189,8 +154,56 @@ impl<'a> CircomTranspiler<'a> {
 
     fn transpile_instruction(&mut self, instr: &Instruction) -> String {
         match instr {
-            Instruction::ExprStmt(expr) => {
-                format!("{}{};", self.get_indent(), self.transpile_expr(expr))
+            Instruction::Assign(varref, right) => {
+                let var = self.circuit.get_variable(varref);
+                assert_eq!(
+                    var.role,
+                    VariableRole::Local,
+                    "Assignment are only possible with variables"
+                );
+                assert_eq!(
+                    var.var_type,
+                    VariableType::Field,
+                    "Assignment are only possible with fields"
+                );
+
+                format!(
+                    "{}{}={}",
+                    self.get_indent(),
+                    var.name,
+                    self.transpile_expr(right)
+                )
+            }
+            Instruction::ArrayAssign(varref, index, val) => {
+                let var = self.circuit.get_variable(varref);
+                assert_eq!(
+                    var.role,
+                    VariableRole::Local,
+                    "Assignment is only possible between variables"
+                );
+                assert!(matches!(var.var_type, VariableType::Array(_)));
+
+                format!(
+                    "{}{}[{}]={}",
+                    self.get_indent(),
+                    var.name,
+                    self.transpile_expr(index),
+                    self.transpile_expr(val)
+                )
+            }
+            Instruction::Constraint(varref, right) => {
+                let var = self.circuit.get_variable(varref);
+                assert_eq!(
+                    var.role,
+                    VariableRole::Signal(SignalType::Output),
+                    "Constraint are only possible when the target is an output signal"
+                );
+                format!(
+                    "{}{}<=={}",
+                    self.get_indent(),
+                    var.name,
+                    self.transpile_expr(right)
+                )
             }
             Instruction::VarDecl(var) => {
                 let prefix = match &var.role {
@@ -298,11 +311,11 @@ impl<'a> CircomTranspiler<'a> {
                 body,
             } => {
                 assert!(
-                    matches!(init, Expr::Assign(_, _)),
+                    matches!(**init, Instruction::Assign(_, _)),
                     "For-loop inits must be an assignment"
                 );
                 assert!(
-                    matches!(step, Expr::Assign(_, _)),
+                    matches!(**step, Instruction::Assign(_, _)),
                     "For-loop steps must be an assignment"
                 );
                 assert!(!body.is_empty(), "Empty for loop bodies are not allowed");
@@ -313,9 +326,9 @@ impl<'a> CircomTranspiler<'a> {
                     &mut res,
                     "{}for ({init}; {cond}; {step}) {{\n",
                     self.get_indent(),
-                    init = self.transpile_expr(init),
+                    init = self.transpile_instruction(init),
                     cond = self.transpile_expr(cond),
-                    step = self.transpile_expr(step),
+                    step = self.transpile_instruction(step),
                 )
                 .unwrap();
 
