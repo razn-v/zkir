@@ -5,7 +5,7 @@ use crate::{
 
 macro_rules! gen_bin_expr {
     ($op:path) => {{
-        |m: &mut Mutator, depth: usize, only_initialized_vars: bool| {
+        |m: &mut Generator, depth: usize, only_initialized_vars: bool| {
             let left = m.generate_expr(depth + 1, only_initialized_vars);
             let right = m.generate_expr(depth + 1, only_initialized_vars);
 
@@ -20,7 +20,7 @@ macro_rules! gen_bin_expr {
 
 macro_rules! gen_un_expr {
     ($op:path) => {{
-        |m: &mut Mutator, depth: usize, only_initialized_vars: bool| {
+        |m: &mut Generator, depth: usize, only_initialized_vars: bool| {
             let expr = m.generate_expr(depth + 1, only_initialized_vars);
             expr.map(|e| $op(Box::new(e)))
         }
@@ -93,13 +93,13 @@ impl ScopeStack {
     }
 }
 
-pub struct Mutator {
+pub struct Generator {
     rng: Rng,
     n_instr: usize,
     scope_stack: ScopeStack,
 }
 
-impl Mutator {
+impl Generator {
     pub fn new(rng: Rng) -> Self {
         Self {
             rng,
@@ -133,7 +133,7 @@ impl Mutator {
 
         self.n_instr += 1;
 
-        let funcs: &[fn(&mut Mutator) -> Option<Instruction>; Instruction::INSTRUCTION_COUNT] = &[
+        let funcs: &[fn(&mut Generator) -> Option<Instruction>; Instruction::INSTRUCTION_COUNT] = &[
             Self::gen_var_decl,
             Self::gen_assign,
             Self::gen_array_assign,
@@ -186,7 +186,6 @@ impl Mutator {
             .collect();
 
         let var_id = self.rng.rand_vec(&vars)?.clone();
-
         // We can only initialize variables to initialized variables
         let expr = self.generate_expr(0, true)?;
 
@@ -369,7 +368,7 @@ impl Mutator {
             return None;
         }
 
-        let funcs: &[fn(&mut Mutator, depth: usize, only_initialized_vars: bool) -> Option<Expr>;
+        let funcs: &[fn(&mut Generator, depth: usize, only_initialized_vars: bool) -> Option<Expr>;
              Expr::EXPR_COUNT] = &[
             Self::gen_var,
             Self::gen_constant,
