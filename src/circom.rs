@@ -112,7 +112,7 @@ impl<'a> CircomTranspiler<'a> {
                     self.transpile_expr(right)
                 )
             }
-            Expr::Not(expr) => format!("(!{})", self.transpile_expr(expr)),
+            //Expr::Not(expr) => format!("(!{})", self.transpile_expr(expr)),
             Expr::BitAnd(left, right) => {
                 format!(
                     "({}&{})",

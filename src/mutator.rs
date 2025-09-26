@@ -4,26 +4,26 @@ use crate::{
 };
 
 macro_rules! gen_bin_expr {
-    ($self:ident, $depth:ident, $op:path, $only_initialized_vars:ident) => {{
-        let left = $self.generate_expr($depth + 1, $only_initialized_vars);
-        let right = $self.generate_expr($depth + 1, $only_initialized_vars);
+    ($op:path) => {{
+        |m: &mut Mutator, depth: usize, only_initialized_vars: bool| {
+            let left = m.generate_expr(depth + 1, only_initialized_vars);
+            let right = m.generate_expr(depth + 1, only_initialized_vars);
 
-        if left.is_none() || right.is_none() {
-            return None;
+            if left.is_none() || right.is_none() {
+                return None;
+            }
+
+            Some($op(Box::new(left.unwrap()), Box::new(right.unwrap())))
         }
-
-        Some($op(Box::new(left.unwrap()), Box::new(right.unwrap())))
     }};
 }
 
 macro_rules! gen_un_expr {
-    ($self:ident, $depth:ident, $op:path, $only_initialized_vars:ident) => {{
-        let expr = $self.generate_expr($depth + 1, $only_initialized_vars);
-        if expr.is_none() {
-            return None;
+    ($op:path) => {{
+        |m: &mut Mutator, depth: usize, only_initialized_vars: bool| {
+            let expr = m.generate_expr(depth + 1, only_initialized_vars);
+            expr.map(|e| $op(Box::new(e)))
         }
-
-        Some($op(Box::new(expr.unwrap())))
     }};
 }
 
@@ -133,292 +133,21 @@ impl Mutator {
 
         self.n_instr += 1;
 
-        let instr: Option<Instruction> = match self.rng.rand(0, Instruction::INSTRUCTION_COUNT - 1)
-        {
-            0 => {
-                // VarDecl
-                Some(Instruction::VarDecl(self.generate_var()))
-            }
-            1 => {
-                // Assign
-                self.generate_assign(false)
-            }
-            2 => {
-                // ArrayAssign
-                let vars: Vec<(VarRef, usize)> = self
-                    .scope_stack
-                    .get_scope_vars()
-                    .into_iter()
-                    .filter_map(|var| {
-                        if matches!(var.role, VariableRole::Local) {
-                            if let VariableType::Array(n) = var.var_type {
-                                return Some((var.id.clone(), n));
-                            }
-                        }
-                        None
-                    })
-                    .collect();
+        let funcs: &[fn(&mut Mutator) -> Option<Instruction>; Instruction::INSTRUCTION_COUNT] = &[
+            Self::gen_var_decl,
+            Self::gen_assign,
+            Self::gen_array_assign,
+            Self::gen_constraint,
+            Self::gen_if,
+            Self::gen_for,
+            Self::gen_while,
+        ];
 
-                if let Some((varref, n)) = self.rng.rand_vec(&vars) {
-                    // We can only assign an array index to initialized variables
-                    let expr = self.generate_expr(0, true);
-
-                    if let Some(expr) = expr {
-                        let idx = self.rng.rand(0, n - 1);
-
-                        return Some(Instruction::ArrayAssign(
-                            varref.clone(),
-                            Box::new(Expr::Constant(idx.to_string())),
-                            Box::new(expr),
-                        ));
-                    }
-                }
-
-                None
-            }
-            3 => {
-                // Constraint
-                let vars: Vec<VarRef> = self
-                    .scope_stack
-                    .get_scope_vars()
-                    .iter()
-                    .filter(|var| matches!(var.role, VariableRole::Signal(SignalType::Output)))
-                    .map(|var| var.id.clone())
-                    .collect();
-
-                if let Some(var_id) = self.rng.rand_vec(&vars) {
-                    let expr = self.generate_expr(0, false);
-                    if let Some(expr) = expr {
-                        return Some(Instruction::Constraint(var_id.clone(), Box::new(expr)));
-                    }
-                }
-
-                None
-            }
-            4 => {
-                // If
-                let cond = self.generate_expr(0, true);
-                if cond.is_none() {
-                    return None;
-                }
-
-                self.scope_stack.enter_scope();
-
-                let mut then_branch = Vec::<Instruction>::new();
-                for _ in 1..self.rng.rand(1, 5) {
-                    let instr = self.generate_instr();
-                    if let Some(instr) = instr {
-                        then_branch.push(instr);
-                    }
-                }
-
-                self.scope_stack.leave_scope();
-
-                if then_branch.is_empty() {
-                    println!("No then_branch found for IF");
-                    return None;
-                }
-
-                self.scope_stack.enter_scope();
-
-                let mut else_branch: Option<Vec<Instruction>> = None;
-                // Add an else branch half of the time
-                if self.rng.rand(0, 1) == 0 {
-                    let mut instrs = Vec::<Instruction>::new();
-                    for _ in 1..self.rng.rand(1, 5) {
-                        let instr = self.generate_instr();
-                        if let Some(instr) = instr {
-                            instrs.push(instr);
-                        }
-                    }
-                    if !instrs.is_empty() {
-                        else_branch = Some(instrs);
-                    }
-                }
-
-                self.scope_stack.leave_scope();
-
-                Some(Instruction::If {
-                    cond: cond.unwrap(),
-                    then_branch: then_branch,
-                    else_branch: else_branch,
-                })
-            }
-            5 => {
-                // For
-                let init =
-                    if let Some(Instruction::Assign(varr, expr)) = self.generate_assign(false) {
-                        Instruction::Assign(varr, expr)
-                    } else {
-                        return None;
-                    };
-
-                let cond = self.generate_expr(0, true);
-                if cond.is_none() {
-                    return None;
-                }
-
-                let step =
-                    if let Some(Instruction::Assign(varr, expr)) = self.generate_assign(false) {
-                        Instruction::Assign(varr, expr)
-                    } else {
-                        return None;
-                    };
-
-                self.scope_stack.enter_scope();
-
-                let mut body = Vec::<Instruction>::new();
-                for _ in 1..self.rng.rand(1, 5) {
-                    let instr = self.generate_instr();
-                    if let Some(instr) = instr {
-                        body.push(instr);
-                    }
-                }
-
-                self.scope_stack.leave_scope();
-
-                if body.is_empty() {
-                    return None;
-                }
-
-                Some(Instruction::For {
-                    init: Box::new(init),
-                    cond: cond.unwrap(),
-                    step: Box::new(step),
-                    body: body,
-                })
-            }
-            6 => {
-                // While
-                let cond = self.generate_expr(0, true);
-                if cond.is_none() {
-                    return None;
-                }
-
-                self.scope_stack.enter_scope();
-
-                let mut body = Vec::<Instruction>::new();
-                for _ in 1..self.rng.rand(1, 5) {
-                    let instr = self.generate_instr();
-                    if let Some(instr) = instr {
-                        body.push(instr);
-                    }
-                }
-
-                self.scope_stack.leave_scope();
-
-                if body.is_empty() {
-                    return None;
-                }
-
-                Some(Instruction::While {
-                    cond: cond.unwrap(),
-                    body: body,
-                })
-            }
-            _ => None,
-        };
-
-        instr
+        let idx: usize = self.rng.rand(0, funcs.len() - 1);
+        (funcs[idx])(self)
     }
 
-    pub fn generate_expr(&mut self, depth: usize, only_initialized_vars: bool) -> Option<Expr> {
-        // 1/3 chance of returning a random constant
-        if depth != 0 && self.rng.rand(1, 3) == 1 {
-            return Some(Expr::Constant(self.rng.next().to_string()));
-        }
-
-        // 1/5 chance of stopping here
-        if self.rng.rand(1, 5) == 1 {
-            return None;
-        }
-
-        match self.rng.rand(1, Expr::EXPR_COUNT - 1) {
-            0 => {
-                // Var
-
-                // Only pick Field variables because Arrays can only be accessed with ArrayIndex expressions
-                let vars = self
-                    .scope_stack
-                    .get_scope_vars()
-                    .iter()
-                    .filter(|var| {
-                        if only_initialized_vars {
-                            matches!(var.var_type, VariableType::Field) && var.initialized
-                        } else {
-                            matches!(var.var_type, VariableType::Field)
-                        }
-                    })
-                    .map(|var| var.id.clone())
-                    .collect();
-                let varref = self.rng.rand_vec(&vars);
-
-                if let Some(varref) = varref {
-                    Some(Expr::Var(varref.clone()))
-                } else {
-                    None
-                }
-            }
-            1 => {
-                // Constant
-                Some(Expr::Constant(self.rng.next().to_string()))
-            }
-            2 => {
-                // ArrayIndex
-                let vars: Vec<(VarRef, usize)> = self
-                    .scope_stack
-                    .get_scope_vars()
-                    .iter()
-                    .filter_map(|var| {
-                        if let VariableType::Array(n) = var.var_type {
-                            if only_initialized_vars && !var.initialized {
-                                return None;
-                            }
-                            Some((var.id.clone(), n))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-
-                if let Some((varref, n)) = self.rng.rand_vec(&vars) {
-                    let idx = self.rng.rand(0, n - 1);
-
-                    Some(Expr::ArrayIndex(
-                        varref.clone(),
-                        Box::new(Expr::Constant(idx.to_string())),
-                    ))
-                } else {
-                    None
-                }
-            }
-            3 => gen_bin_expr!(self, depth, Expr::Add, only_initialized_vars),
-            4 => gen_bin_expr!(self, depth, Expr::Sub, only_initialized_vars),
-            5 => gen_bin_expr!(self, depth, Expr::Mul, only_initialized_vars),
-            6 => gen_bin_expr!(self, depth, Expr::Power, only_initialized_vars),
-            7 => gen_bin_expr!(self, depth, Expr::Div, only_initialized_vars),
-            8 => gen_bin_expr!(self, depth, Expr::IntDiv, only_initialized_vars),
-            9 => gen_bin_expr!(self, depth, Expr::Rem, only_initialized_vars),
-            10 => gen_bin_expr!(self, depth, Expr::LessThan, only_initialized_vars),
-            11 => gen_bin_expr!(self, depth, Expr::LessThanEq, only_initialized_vars),
-            12 => gen_bin_expr!(self, depth, Expr::GreaterThan, only_initialized_vars),
-            13 => gen_bin_expr!(self, depth, Expr::GreaterThanEq, only_initialized_vars),
-            14 => gen_bin_expr!(self, depth, Expr::Equal, only_initialized_vars),
-            15 => gen_bin_expr!(self, depth, Expr::And, only_initialized_vars),
-            16 => gen_bin_expr!(self, depth, Expr::Or, only_initialized_vars),
-            // Broken on Circom for some reason
-            //17 => gen_un_expr!(self, depth, Expr::Not, only_initialized_vars),
-            18 => gen_bin_expr!(self, depth, Expr::BitAnd, only_initialized_vars),
-            19 => gen_bin_expr!(self, depth, Expr::BitOr, only_initialized_vars),
-            20 => gen_un_expr!(self, depth, Expr::BitNot, only_initialized_vars),
-            21 => gen_bin_expr!(self, depth, Expr::BitXor, only_initialized_vars),
-            22 => gen_bin_expr!(self, depth, Expr::BitRShift, only_initialized_vars),
-            23 => gen_bin_expr!(self, depth, Expr::BitLShift, only_initialized_vars),
-            _ => None,
-        }
-    }
-
-    pub fn generate_var(&mut self) -> Variable {
+    pub fn gen_var_decl(&mut self) -> Option<Instruction> {
         let var_type: VariableType;
         if self.rng.rand(0, 1) == 0 {
             var_type = VariableType::Field;
@@ -437,19 +166,19 @@ impl Mutator {
             role = VariableRole::Local;
         }
 
-        self.scope_stack
-            .add_var(self.rng.rand_string(8), var_type, role)
+        Some(Instruction::VarDecl(self.scope_stack.add_var(
+            self.rng.rand_string(8),
+            var_type,
+            role,
+        )))
     }
 
-    fn generate_assign(&mut self, only_initialized_vars: bool) -> Option<Instruction> {
+    pub fn gen_assign(&mut self) -> Option<Instruction> {
         let vars: Vec<VarRef> = self
             .scope_stack
             .get_scope_vars()
             .iter()
             .filter(|var| {
-                if only_initialized_vars && !var.initialized {
-                    return false;
-                }
                 matches!(var.role, VariableRole::Local)
                     && matches!(var.var_type, VariableType::Field)
             })
@@ -465,5 +194,268 @@ impl Mutator {
         self.scope_stack.mark_initialized(&var_id);
 
         Some(Instruction::Assign(var_id, Box::new(expr)))
+    }
+
+    pub fn gen_array_assign(&mut self) -> Option<Instruction> {
+        let vars: Vec<(VarRef, usize)> = self
+            .scope_stack
+            .get_scope_vars()
+            .into_iter()
+            .filter_map(|var| {
+                if matches!(var.role, VariableRole::Local) {
+                    if let VariableType::Array(n) = var.var_type {
+                        return Some((var.id.clone(), n));
+                    }
+                }
+                None
+            })
+            .collect();
+
+        if let Some((varref, n)) = self.rng.rand_vec(&vars) {
+            // We can only assign an array index to initialized variables
+            let expr = self.generate_expr(0, true);
+
+            if let Some(expr) = expr {
+                let idx = self.rng.rand(0, n - 1);
+
+                return Some(Instruction::ArrayAssign(
+                    varref.clone(),
+                    Box::new(Expr::Constant(idx.to_string())),
+                    Box::new(expr),
+                ));
+            }
+        }
+
+        None
+    }
+
+    pub fn gen_constraint(&mut self) -> Option<Instruction> {
+        let vars: Vec<VarRef> = self
+            .scope_stack
+            .get_scope_vars()
+            .iter()
+            .filter(|var| matches!(var.role, VariableRole::Signal(SignalType::Output)))
+            .map(|var| var.id.clone())
+            .collect();
+
+        if let Some(var_id) = self.rng.rand_vec(&vars) {
+            let expr = self.generate_expr(0, false);
+            if let Some(expr) = expr {
+                return Some(Instruction::Constraint(var_id.clone(), Box::new(expr)));
+            }
+        }
+
+        None
+    }
+
+    pub fn gen_if(&mut self) -> Option<Instruction> {
+        let cond = self.generate_expr(0, true)?;
+
+        self.scope_stack.enter_scope();
+
+        let mut then_branch = Vec::<Instruction>::new();
+        for _ in 1..self.rng.rand(1, 5) {
+            let instr = self.generate_instr();
+            if let Some(instr) = instr {
+                then_branch.push(instr);
+            }
+        }
+
+        self.scope_stack.leave_scope();
+
+        if then_branch.is_empty() {
+            println!("No then_branch found for IF");
+            return None;
+        }
+
+        self.scope_stack.enter_scope();
+
+        let mut else_branch: Option<Vec<Instruction>> = None;
+        // Add an else branch half of the time
+        if self.rng.rand(0, 1) == 0 {
+            let mut instrs = Vec::<Instruction>::new();
+            for _ in 1..self.rng.rand(1, 5) {
+                let instr = self.generate_instr();
+                if let Some(instr) = instr {
+                    instrs.push(instr);
+                }
+            }
+            if !instrs.is_empty() {
+                else_branch = Some(instrs);
+            }
+        }
+
+        self.scope_stack.leave_scope();
+
+        Some(Instruction::If {
+            cond: cond,
+            then_branch: then_branch,
+            else_branch: else_branch,
+        })
+    }
+
+    pub fn gen_for(&mut self) -> Option<Instruction> {
+        let init = if let Some(Instruction::Assign(varr, expr)) = self.gen_assign() {
+            Instruction::Assign(varr, expr)
+        } else {
+            return None;
+        };
+
+        let cond = self.generate_expr(0, true)?;
+
+        let step = if let Some(Instruction::Assign(varr, expr)) = self.gen_assign() {
+            Instruction::Assign(varr, expr)
+        } else {
+            return None;
+        };
+
+        self.scope_stack.enter_scope();
+
+        let mut body = Vec::<Instruction>::new();
+        for _ in 1..self.rng.rand(1, 5) {
+            let instr = self.generate_instr();
+            if let Some(instr) = instr {
+                body.push(instr);
+            }
+        }
+
+        self.scope_stack.leave_scope();
+
+        if body.is_empty() {
+            return None;
+        }
+
+        Some(Instruction::For {
+            init: Box::new(init),
+            cond: cond,
+            step: Box::new(step),
+            body: body,
+        })
+    }
+
+    pub fn gen_while(&mut self) -> Option<Instruction> {
+        let cond = self.generate_expr(0, true)?;
+
+        self.scope_stack.enter_scope();
+
+        let mut body = Vec::<Instruction>::new();
+        for _ in 1..self.rng.rand(1, 5) {
+            let instr = self.generate_instr();
+            if let Some(instr) = instr {
+                body.push(instr);
+            }
+        }
+
+        self.scope_stack.leave_scope();
+
+        if body.is_empty() {
+            return None;
+        }
+
+        Some(Instruction::While {
+            cond: cond,
+            body: body,
+        })
+    }
+
+    pub fn generate_expr(&mut self, depth: usize, only_initialized_vars: bool) -> Option<Expr> {
+        // 1/3 chance of returning a random constant
+        if depth != 0 && self.rng.rand(1, 3) == 1 {
+            return Some(Expr::Constant(self.rng.next().to_string()));
+        }
+
+        // 1/5 chance of stopping here
+        if self.rng.rand(1, 5) == 1 {
+            return None;
+        }
+
+        let funcs: &[fn(&mut Mutator, depth: usize, only_initialized_vars: bool) -> Option<Expr>;
+             Expr::EXPR_COUNT] = &[
+            Self::gen_var,
+            Self::gen_constant,
+            Self::gen_array_index,
+            gen_bin_expr!(Expr::Add),
+            gen_bin_expr!(Expr::Sub),
+            gen_bin_expr!(Expr::Mul),
+            gen_bin_expr!(Expr::Power),
+            gen_bin_expr!(Expr::Div),
+            gen_bin_expr!(Expr::IntDiv),
+            gen_bin_expr!(Expr::Rem),
+            gen_bin_expr!(Expr::LessThan),
+            gen_bin_expr!(Expr::LessThanEq),
+            gen_bin_expr!(Expr::GreaterThan),
+            gen_bin_expr!(Expr::GreaterThanEq),
+            gen_bin_expr!(Expr::Equal),
+            gen_bin_expr!(Expr::And),
+            gen_bin_expr!(Expr::Or),
+            // Broken on Circom for some reason
+            //gen_un_expr!(Expr::Not),
+            gen_bin_expr!(Expr::BitAnd),
+            gen_bin_expr!(Expr::BitOr),
+            gen_un_expr!(Expr::BitNot),
+            gen_bin_expr!(Expr::BitXor),
+            gen_bin_expr!(Expr::BitRShift),
+            gen_bin_expr!(Expr::BitLShift),
+        ];
+
+        let idx: usize = self.rng.rand(0, funcs.len() - 1);
+        (funcs[idx])(self, depth, only_initialized_vars)
+    }
+
+    pub fn gen_var(&mut self, _depth: usize, only_initialized_vars: bool) -> Option<Expr> {
+        // Only pick Field variables because Arrays can only be accessed with ArrayIndex expressions
+        let vars = self
+            .scope_stack
+            .get_scope_vars()
+            .iter()
+            .filter(|var| {
+                if only_initialized_vars && !var.initialized {
+                    false
+                } else {
+                    matches!(var.var_type, VariableType::Field)
+                }
+            })
+            .map(|var| var.id.clone())
+            .collect();
+        let varref = self.rng.rand_vec(&vars);
+
+        if let Some(varref) = varref {
+            Some(Expr::Var(varref.clone()))
+        } else {
+            None
+        }
+    }
+
+    pub fn gen_constant(&mut self, _depth: usize, _only_initialized_vars: bool) -> Option<Expr> {
+        Some(Expr::Constant(self.rng.next().to_string()))
+    }
+
+    pub fn gen_array_index(&mut self, _depth: usize, only_initialized_vars: bool) -> Option<Expr> {
+        let vars: Vec<(VarRef, usize)> = self
+            .scope_stack
+            .get_scope_vars()
+            .iter()
+            .filter_map(|var| {
+                if let VariableType::Array(n) = var.var_type {
+                    if only_initialized_vars && !var.initialized {
+                        return None;
+                    }
+                    Some((var.id.clone(), n))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if let Some((varref, n)) = self.rng.rand_vec(&vars) {
+            let idx = self.rng.rand(0, n - 1);
+
+            Some(Expr::ArrayIndex(
+                varref.clone(),
+                Box::new(Expr::Constant(idx.to_string())),
+            ))
+        } else {
+            None
+        }
     }
 }
