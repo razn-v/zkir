@@ -1,4 +1,12 @@
+#[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::_rdtsc;
+
+#[cfg(target_arch = "aarch64")]
+unsafe fn _rdtsc() -> u64 {
+    let mut count: u64;
+    std::arch::asm!("mrs {}, cntvct_el0", out(reg) count);
+    count
+}
 
 pub struct Rng(u64);
 
