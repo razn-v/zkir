@@ -205,7 +205,7 @@ impl<'a> CircomTranspiler<'a> {
                     self.transpile_expr(right)
                 )
             }
-            Instruction::VarDecl(var) => {
+            Instruction::VarDecl(var, default_value) => {
                 let prefix = match &var.role {
                     VariableRole::Signal(signal_type) => {
                         let signal_type = match signal_type {
@@ -219,16 +219,37 @@ impl<'a> CircomTranspiler<'a> {
 
                 match var.var_type {
                     VariableType::Field => {
-                        format!("{}{prefix} {name};", self.get_indent(), name = var.name)
+                        if let Some(default_value) = default_value {
+                            format!(
+                                "{}{prefix} {name} = {default_value};",
+                                self.get_indent(),
+                                prefix = prefix,
+                                name = var.name,
+                                default_value = self.transpile_expr(default_value)
+                            )
+                        } else {
+                            format!("{}{prefix} {name};", self.get_indent(), name = var.name)
+                        }
                     }
                     VariableType::Array(size) => {
-                        format!(
-                            "{}{prefix} {name}[{size}];",
-                            self.get_indent(),
-                            prefix = prefix,
-                            name = var.name,
-                            size = size
-                        )
+                        if let Some(default_value) = default_value {
+                            format!(
+                                "{}{prefix} {name}[{size}] = {default_value};",
+                                self.get_indent(),
+                                prefix = prefix,
+                                name = var.name,
+                                size = size,
+                                default_value = self.transpile_expr(default_value)
+                            )
+                        } else {
+                            format!(
+                                "{}{prefix} {name}[{size}];",
+                                self.get_indent(),
+                                prefix = prefix,
+                                name = var.name,
+                                size = size
+                            )
+                        }
                     }
                 }
             }
@@ -311,7 +332,8 @@ impl<'a> CircomTranspiler<'a> {
                 body,
             } => {
                 assert!(
-                    matches!(**init, Instruction::Assign(_, _)),
+                    matches!(**init, Instruction::Assign(_, _))
+                        || matches!(**init, Instruction::VarDecl(_, _)),
                     "For-loop inits must be an assignment"
                 );
                 assert!(

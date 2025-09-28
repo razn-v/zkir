@@ -69,7 +69,7 @@ pub struct Variable {
 
 #[derive(Clone)]
 pub enum Instruction {
-    VarDecl(Variable),
+    VarDecl(Variable, Option<Expr>),
     Assign(VarRef, Box<Expr>),
     ArrayAssign(VarRef, Box<Expr>, Box<Expr>),
     Constraint(VarRef, Box<Expr>),

@@ -60,13 +60,19 @@ impl ScopeStack {
         self.stack.pop();
     }
 
-    fn add_var(&mut self, name: String, var_type: VariableType, role: VariableRole) -> Variable {
+    fn add_var(
+        &mut self,
+        name: String,
+        var_type: VariableType,
+        role: VariableRole,
+        initialized: bool,
+    ) -> Variable {
         let var = Variable {
             id: VarRef(self.next_id),
             name: name,
             var_type: var_type,
             role: role,
-            initialized: false,
+            initialized,
         };
 
         self.stack.last_mut().unwrap().vars.push(var.clone());
@@ -134,7 +140,7 @@ impl Generator {
         self.n_instr += 1;
 
         let funcs: &[fn(&mut Generator) -> Option<Instruction>; Instruction::INSTRUCTION_COUNT] = &[
-            Self::gen_var_decl,
+            Self::gen_var_decl_default,
             Self::gen_assign,
             Self::gen_array_assign,
             Self::gen_constraint,
@@ -147,30 +153,52 @@ impl Generator {
         (funcs[idx])(self)
     }
 
-    pub fn gen_var_decl(&mut self) -> Option<Instruction> {
-        let var_type: VariableType;
-        if self.rng.rand(0, 1) == 0 {
-            var_type = VariableType::Field;
-        } else {
-            var_type = VariableType::Array(self.rng.rand(1, 10));
-        }
+    fn gen_var_decl_default(&mut self) -> Option<Instruction> {
+        self.gen_var_decl(None, None, None)
+    }
 
-        let role: VariableRole;
-        if self.rng.rand(0, 1) == 0 {
+    pub fn gen_var_decl(
+        &mut self,
+        type_kind: Option<VariableType>,
+        role_kind: Option<VariableRole>,
+        default_value: Option<Expr>,
+    ) -> Option<Instruction> {
+        let var_type = type_kind.unwrap_or_else(|| {
             if self.rng.rand(0, 1) == 0 {
-                role = VariableRole::Signal(SignalType::Input);
+                VariableType::Field
             } else {
-                role = VariableRole::Signal(SignalType::Output);
+                VariableType::Array(self.rng.rand(1, 10))
             }
-        } else {
-            role = VariableRole::Local;
+        });
+
+        let role = role_kind.unwrap_or_else(|| {
+            if self.rng.rand(0, 1) == 0 {
+                if self.rng.rand(0, 1) == 0 {
+                    VariableRole::Signal(SignalType::Input)
+                } else {
+                    VariableRole::Signal(SignalType::Output)
+                }
+            } else {
+                VariableRole::Local
+            }
+        });
+
+        // 9/10 chance of declaring a variable with a default value
+        let mut default_value = default_value;
+        if default_value.is_none() && self.rng.rand(1, 10) != 1 {
+            let val = self.generate_expr(0, true)?;
+            default_value = Some(val);
         }
 
-        Some(Instruction::VarDecl(self.scope_stack.add_var(
-            self.rng.rand_string(8),
-            var_type,
-            role,
-        )))
+        Some(Instruction::VarDecl(
+            self.scope_stack.add_var(
+                self.rng.rand_string(8),
+                var_type,
+                role,
+                default_value.is_some(),
+            ),
+            default_value,
+        ))
     }
 
     pub fn gen_assign(&mut self) -> Option<Instruction> {
@@ -294,17 +322,32 @@ impl Generator {
     }
 
     pub fn gen_for(&mut self) -> Option<Instruction> {
-        let init = if let Some(Instruction::Assign(varr, expr)) = self.gen_assign() {
-            Instruction::Assign(varr, expr)
-        } else {
+        let init: Option<Instruction>;
+        // 4/5 chance of declaring a new variable
+        if self.rng.rand(1, 5) != 1 {
+            // Our variable *must* have a default value
+            let default_value = self.generate_expr(0, true)?;
+            init = self.gen_var_decl(
+                Some(VariableType::Field),
+                Some(VariableRole::Local),
+                Some(default_value),
+            );
+        }
+        // 1/5 chance of reusing an existing variable
+        else {
+            init = self.gen_assign();
+        }
+
+        if init.is_none() {
+            println!("No init found for FOR");
             return None;
-        };
+        }
 
         let cond = self.generate_expr(0, true)?;
-
         let step = if let Some(Instruction::Assign(varr, expr)) = self.gen_assign() {
             Instruction::Assign(varr, expr)
         } else {
+            println!("No step found for FOR");
             return None;
         };
 
@@ -321,11 +364,12 @@ impl Generator {
         self.scope_stack.leave_scope();
 
         if body.is_empty() {
+            println!("No body found for FOR");
             return None;
         }
 
         Some(Instruction::For {
-            init: Box::new(init),
+            init: Box::new(init.unwrap()),
             cond: cond,
             step: Box::new(step),
             body: body,
