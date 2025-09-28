@@ -4,7 +4,9 @@ pub struct Rng(u64);
 
 impl Rng {
     pub fn new() -> Self {
-        unsafe { Self(_rdtsc()) }
+        unsafe {
+            Self(0x13371337 /*_rdtsc()*/)
+        }
     }
 
     pub fn next(&mut self) -> usize {
