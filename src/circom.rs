@@ -346,9 +346,9 @@ impl<'a> CircomTranspiler<'a> {
 
                 write!(
                     &mut res,
-                    "{}for ({init}; {cond}; {step}) {{\n",
+                    "{}for ({init} {cond}; {step}) {{\n",
                     self.get_indent(),
-                    init = self.transpile_instruction(init),
+                    init = self.transpile_instruction(init).trim(),
                     cond = self.transpile_expr(cond),
                     step = self.transpile_instruction(step),
                 )

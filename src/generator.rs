@@ -234,7 +234,19 @@ impl Generator {
             }
         });
 
+        // 9/10 chance of declaring a variable with a default value
+        let mut default_value = default_value;
+        if default_value.is_none() && self.rng.rand(1, 10) != 1 {
+            let val = self.generate_expr(0)?;
+            default_value = Some(val);
+        }
+
         let role = role_kind.unwrap_or_else(|| {
+            // We can only assign a default value to locals
+            if default_value.is_some() {
+                return VariableRole::Local;
+            }
+
             if self.rng.rand(0, 1) == 0 {
                 if self.rng.rand(0, 1) == 0 {
                     VariableRole::Signal(SignalType::Input)
@@ -245,13 +257,6 @@ impl Generator {
                 VariableRole::Local
             }
         });
-
-        // 9/10 chance of declaring a variable with a default value
-        let mut default_value = default_value;
-        if default_value.is_none() && self.rng.rand(1, 10) != 1 {
-            let val = self.generate_expr(0)?;
-            default_value = Some(val);
-        }
 
         Some(Instruction::VarDecl(
             self.scope_stack.add_var(
