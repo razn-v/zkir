@@ -36,10 +36,6 @@ pub enum Expr {
     BitLShift(Box<Expr>, Box<Expr>),
 }
 
-impl Expr {
-    pub const EXPR_COUNT: usize = std::mem::variant_count::<Expr>();
-}
-
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum VariableType {
     Field,
@@ -88,10 +84,6 @@ pub enum Instruction {
         cond: Expr,
         body: Vec<Instruction>,
     },
-}
-
-impl Instruction {
-    pub const INSTRUCTION_COUNT: usize = std::mem::variant_count::<Instruction>();
 }
 
 pub struct Circuit {

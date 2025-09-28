@@ -213,6 +213,7 @@ impl Generator {
             }
             println!(" ===");
         }
+        println!(" ===");
         (funcs[idx])(self)
     }
 
