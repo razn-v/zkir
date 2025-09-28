@@ -227,11 +227,12 @@ impl Generator {
         default_value: Option<Expr>,
     ) -> Option<Instruction> {
         let var_type = type_kind.unwrap_or_else(|| {
-            if self.rng.rand(0, 1) == 0 {
-                VariableType::Field
-            } else {
-                VariableType::Array(self.rng.rand(1, 10))
-            }
+            // TODO: Support array declaration
+            //if self.rng.rand(0, 1) == 0 {
+            VariableType::Field
+            //} else {
+            //    VariableType::Array(self.rng.rand(1, 10))
+            //}
         });
 
         // 9/10 chance of declaring a variable with a default value
