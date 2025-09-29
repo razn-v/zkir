@@ -168,7 +168,7 @@ impl<'a> CircomTranspiler<'a> {
                 );
 
                 format!(
-                    "{}{}={}",
+                    "{}{}={};",
                     self.get_indent(),
                     var.name,
                     self.transpile_expr(right)
@@ -184,7 +184,7 @@ impl<'a> CircomTranspiler<'a> {
                 assert!(matches!(var.var_type, VariableType::Array(_)));
 
                 format!(
-                    "{}{}[{}]={}",
+                    "{}{}[{}]={};",
                     self.get_indent(),
                     var.name,
                     self.transpile_expr(index),
@@ -199,7 +199,7 @@ impl<'a> CircomTranspiler<'a> {
                     "Constraint are only possible when the target is an output signal"
                 );
                 format!(
-                    "{}{}<=={}",
+                    "{}{}<=={};",
                     self.get_indent(),
                     var.name,
                     self.transpile_expr(right)
@@ -350,7 +350,7 @@ impl<'a> CircomTranspiler<'a> {
                     self.get_indent(),
                     init = self.transpile_instruction(init).trim(),
                     cond = self.transpile_expr(cond),
-                    step = self.transpile_instruction(step),
+                    step = self.transpile_instruction(step).replace(";", ""),
                 )
                 .unwrap();
 

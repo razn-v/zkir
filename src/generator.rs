@@ -472,7 +472,7 @@ impl Generator {
 
     pub fn generate_expr(&mut self, depth: usize) -> Option<Expr> {
         // Hard limit to prevent stack overflow
-        if depth >= 5 {
+        if depth >= 1 {
             return Some(Expr::Constant(self.rng.next().to_string()));
         }
 
