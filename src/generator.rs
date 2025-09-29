@@ -139,15 +139,11 @@ impl Generator {
         let n = self.rng.rand(15, 30);
         println!("Generating {} instructions...", n);
 
-        for _ in 1..n {
-            print!("=== NEW INSTRUCTION GENERATION ");
-            let instr = self.generate_instr(true);
+        for _ in 0..n {
+            let instr = self.generate_instr();
             if let Some(instr) = instr {
                 instructions.push(instr);
                 self.n_instr = 0;
-                println!("=== SUCCEEDED! ===")
-            } else {
-                println!("=== FAILED! ===")
             }
         }
 
@@ -159,9 +155,9 @@ impl Generator {
         Circuit::new(self.scope_stack.all_vars.clone(), instructions)
     }
 
-    pub fn generate_instr(&mut self, first: bool) -> Option<Instruction> {
+    pub fn generate_instr(&mut self) -> Option<Instruction> {
         if self.n_instr >= 10 {
-            println!("Reached instruction limit.");
+            //println!("Reached instruction limit.");
             return None;
         }
 
@@ -200,20 +196,6 @@ impl Generator {
         }
 
         let idx: usize = self.rng.rand(0, funcs.len() - 1);
-        if first {
-            match idx {
-                0 => print!("gen_var_decl_default"),
-                1 => print!("gen_if"),
-                2 => print!("gen_for"),
-                3 => print!("gen_while"),
-                4 => print!("gen_assign"),
-                5 => print!("gen_array_assign"),
-                6 => print!("gen_constraint"),
-                _ => unreachable!(),
-            }
-            println!(" ===");
-        }
-        println!(" ===");
         (funcs[idx])(self)
     }
 
@@ -351,8 +333,8 @@ impl Generator {
         self.scope_stack.enter_scope();
 
         let mut then_branch = Vec::<Instruction>::new();
-        for _ in 1..self.rng.rand(1, 5) {
-            let instr = self.generate_instr(false);
+        for _ in 0..self.rng.rand(1, 5) {
+            let instr = self.generate_instr();
             if let Some(instr) = instr {
                 then_branch.push(instr);
             }
@@ -361,7 +343,7 @@ impl Generator {
         self.scope_stack.leave_scope();
 
         if then_branch.is_empty() {
-            println!("No then_branch found for IF");
+            //println!("No then_branch found for IF");
             return None;
         }
 
@@ -371,8 +353,8 @@ impl Generator {
         // Add an else branch half of the time
         if self.rng.rand(0, 1) == 0 {
             let mut instrs = Vec::<Instruction>::new();
-            for _ in 1..self.rng.rand(1, 5) {
-                let instr = self.generate_instr(false);
+            for _ in 0..self.rng.rand(1, 5) {
+                let instr = self.generate_instr();
                 if let Some(instr) = instr {
                     instrs.push(instr);
                 }
@@ -418,13 +400,13 @@ impl Generator {
         let step = if let Some(Instruction::Assign(varr, expr)) = self.gen_assign() {
             Instruction::Assign(varr, expr)
         } else {
-            println!("No step found for FOR");
+            //println!("No step found for FOR");
             return None;
         };
 
         let mut body = Vec::<Instruction>::new();
-        for _ in 1..self.rng.rand(1, 5) {
-            let instr = self.generate_instr(false);
+        for _ in 0..self.rng.rand(1, 5) {
+            let instr = self.generate_instr();
             if let Some(instr) = instr {
                 body.push(instr);
             }
@@ -433,7 +415,7 @@ impl Generator {
         self.scope_stack.leave_scope();
 
         if body.is_empty() {
-            println!("No body found for FOR");
+            //println!("No body found for for loop");
             return None;
         }
 
@@ -451,8 +433,8 @@ impl Generator {
         self.scope_stack.enter_scope();
 
         let mut body = Vec::<Instruction>::new();
-        for _ in 1..self.rng.rand(1, 5) {
-            let instr = self.generate_instr(false);
+        for _ in 0..self.rng.rand(1, 5) {
+            let instr = self.generate_instr();
             if let Some(instr) = instr {
                 body.push(instr);
             }
@@ -461,6 +443,7 @@ impl Generator {
         self.scope_stack.leave_scope();
 
         if body.is_empty() {
+            //println!("No body found for while loop.");
             return None;
         }
 
