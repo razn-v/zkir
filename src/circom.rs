@@ -350,7 +350,7 @@ impl<'a> CircomTranspiler<'a> {
                     self.get_indent(),
                     init = self.transpile_instruction(init).trim(),
                     cond = self.transpile_expr(cond),
-                    step = self.transpile_instruction(step).replace(";", ""),
+                    step = self.transpile_instruction(step).replace(";", "").trim(),
                 )
                 .unwrap();
 

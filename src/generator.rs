@@ -179,9 +179,9 @@ impl Generator {
 
         let mut funcs: Vec<fn(&mut Generator) -> Option<Instruction>> = vec![
             Self::gen_var_decl_default,
-            Self::gen_if,
-            Self::gen_for,
-            Self::gen_while,
+            //Self::gen_if,
+            //Self::gen_for,
+            //Self::gen_while,
         ];
 
         // Only add `gen_assign`, `gen_array_assign` and `gen_constraint` if we can
