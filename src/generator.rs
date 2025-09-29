@@ -313,11 +313,15 @@ impl Generator {
             .scope_stack
             .get_scope_vars()
             .iter()
-            .filter(|var| matches!(var.role, VariableRole::Signal(SignalType::Output)))
+            .filter(|var| {
+                matches!(var.role, VariableRole::Signal(SignalType::Output)) && !var.initialized
+            })
             .map(|var| var.id.clone())
             .collect();
 
         if let Some(var_id) = self.rng.rand_vec(&vars) {
+            self.scope_stack.mark_initialized(&var_id);
+
             let expr = self.generate_expr(0);
             if let Some(expr) = expr {
                 return Some(Instruction::Constraint(var_id.clone(), Box::new(expr)));
