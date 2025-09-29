@@ -394,6 +394,8 @@ impl Generator {
     pub fn gen_for(&mut self) -> Option<Instruction> {
         let init: Option<Instruction>;
 
+        self.scope_stack.enter_scope();
+
         // If no variables are available, we always declare a new variable,
         // otherwise we have a 4/5 chance
         if !self.scope_stack.has_scope_vars() || self.rng.rand(1, 5) != 1 {
@@ -419,8 +421,6 @@ impl Generator {
             println!("No step found for FOR");
             return None;
         };
-
-        self.scope_stack.enter_scope();
 
         let mut body = Vec::<Instruction>::new();
         for _ in 1..self.rng.rand(1, 5) {
