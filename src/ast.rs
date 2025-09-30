@@ -1,7 +1,13 @@
 #![allow(dead_code)]
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct VarRef(pub usize);
+pub struct VarRef {
+    // Unique id used by the variable
+    pub id: usize,
+    // Used to specify a certain index for arrays.
+    // An array can never be referenced as a whole without a specific index.
+    pub idx: Option<usize>,
+}
 
 pub type Field = String;
 
@@ -9,7 +15,6 @@ pub type Field = String;
 pub enum Expr {
     Var(VarRef),
     Constant(Field),
-    ArrayIndex(VarRef, Box<Expr>),
 
     Add(Box<Expr>, Box<Expr>),
     Sub(Box<Expr>, Box<Expr>),
@@ -103,6 +108,6 @@ impl Circuit {
         self.variables
             .iter()
             .find(|var| var.id == *varref)
-            .expect(&format!("Variable {} not found", varref.0))
+            .expect(&format!("Variable {} not found", varref.id))
     }
 }

@@ -70,7 +70,10 @@ impl ScopeStack {
         initialized: bool,
     ) -> Variable {
         let var = Variable {
-            id: VarRef(self.next_id),
+            id: VarRef {
+                id: self.next_id,
+                idx: None,
+            },
             name: name,
             var_type: var_type,
             role: role,
@@ -519,7 +522,6 @@ impl Generator {
     }
 
     pub fn gen_var_ref(&mut self, _depth: usize) -> Option<Expr> {
-        // Only pick Field variables because Arrays can only be accessed with ArrayIndex expressions
         let vars = self
             .scope_stack
             .get_scope_vars()
@@ -566,10 +568,10 @@ impl Generator {
         if let Some((varref, n)) = self.rng.rand_vec(&vars) {
             let idx = self.rng.rand(0, n - 1);
 
-            Some(Expr::ArrayIndex(
-                varref.clone(),
-                Box::new(Expr::Constant(idx.to_string())),
-            ))
+            Some(Expr::Var(VarRef {
+                id: varref.id,
+                idx: Some(idx),
+            }))
         } else {
             None
         }

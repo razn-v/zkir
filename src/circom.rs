@@ -20,12 +20,18 @@ impl<'a> CircomTranspiler<'a> {
 
     fn transpile_expr(&self, expr: &Expr) -> String {
         match expr {
-            Expr::Var(varref) => self.circuit.get_variable(varref).name.clone(),
-            Expr::Constant(field) => field.to_string(),
-            Expr::ArrayIndex(varref, expr) => {
+            Expr::Var(varref) => {
                 let var = self.circuit.get_variable(varref);
-                format!("({}[{}])", var.name, self.transpile_expr(expr))
+
+                if let Some(idx) = varref.idx {
+                    // We have a reference to an array index
+                    format!("({}[{}])", var.name, idx)
+                } else {
+                    // We have a refenrece to a field variable
+                    var.name.clone()
+                }
             }
+            Expr::Constant(field) => field.to_string(),
             Expr::Add(left, right) => {
                 format!(
                     "({}+{})",
