@@ -20,10 +20,10 @@ impl<'a> CircomTranspiler<'a> {
 
     fn transpile_expr(&self, expr: &Expr) -> String {
         match expr {
-            Expr::Var(varref) => {
-                let var = self.circuit.get_variable(varref);
+            Expr::Var(var_ref) => {
+                let var = self.circuit.get_variable(var_ref);
 
-                if let Some(idx) = varref.idx {
+                if let Some(idx) = var_ref.idx {
                     // We have a reference to an array index
                     format!("({}[{}])", var.name, idx)
                 } else {
@@ -160,8 +160,8 @@ impl<'a> CircomTranspiler<'a> {
 
     fn transpile_instruction(&mut self, instr: &Instruction) -> String {
         match instr {
-            Instruction::Assign(varref, right) => {
-                let var = self.circuit.get_variable(varref);
+            Instruction::Assign(var_ref, right) => {
+                let var = self.circuit.get_variable(var_ref);
                 assert_eq!(
                     var.role,
                     VariableRole::Local,
@@ -180,8 +180,8 @@ impl<'a> CircomTranspiler<'a> {
                     self.transpile_expr(right)
                 )
             }
-            Instruction::ArrayAssign(varref, index, val) => {
-                let var = self.circuit.get_variable(varref);
+            Instruction::ArrayAssign(var_ref, index, val) => {
+                let var = self.circuit.get_variable(var_ref);
                 assert_eq!(
                     var.role,
                     VariableRole::Local,
@@ -197,8 +197,8 @@ impl<'a> CircomTranspiler<'a> {
                     self.transpile_expr(val)
                 )
             }
-            Instruction::Constraint(varref, right) => {
-                let var = self.circuit.get_variable(varref);
+            Instruction::Constraint(var_ref, right) => {
+                let var = self.circuit.get_variable(var_ref);
                 assert_eq!(
                     var.role,
                     VariableRole::Signal(SignalType::Output),

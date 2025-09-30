@@ -14,63 +14,63 @@ fn main() {
     /*
     let circuit = Circuit::new(vec![
         Instruction::VarDecl(Variable {
-            id: VarRef(0),
+            id: var_ref(0),
             name: String::from("myvar"),
             var_type: VariableType::Field,
             role: VariableRole::Local,
         }),
         Instruction::VarDecl(Variable {
-            id: VarRef(1),
+            id: var_ref(1),
             name: String::from("myvar2"),
             var_type: VariableType::Field,
             role: VariableRole::Local,
         }),
         Instruction::VarDecl(Variable {
-            id: VarRef(2),
+            id: var_ref(2),
             name: String::from("myarray"),
             var_type: VariableType::Array(5),
             role: VariableRole::Local,
         }),
         Instruction::VarDecl(Variable {
-            id: VarRef(3),
+            id: var_ref(3),
             name: String::from("myoutput"),
             var_type: VariableType::Field,
             role: VariableRole::Signal(SignalType::Output),
         }),
         Instruction::For {
-            init: Expr::Assign(VarRef(0), Box::new(Expr::Constant(String::from("123")))),
+            init: Expr::Assign(var_ref(0), Box::new(Expr::Constant(String::from("123")))),
             cond: Expr::LessThan(
-                Box::new(Expr::Var(VarRef(0))),
+                Box::new(Expr::Var(var_ref(0))),
                 Box::new(Expr::Constant(String::from("42"))),
             ),
-            step: Expr::Assign(VarRef(0), Box::new(Expr::Constant(String::from("1")))),
+            step: Expr::Assign(var_ref(0), Box::new(Expr::Constant(String::from("1")))),
             body: vec![
                 Instruction::ExprStmt(Expr::Assign(
-                    VarRef(1),
+                    var_ref(1),
                     Box::new(Expr::Not(Box::new(Expr::Constant(String::from("5"))))),
                 )),
                 Instruction::ExprStmt(Expr::ArrayAssign(
-                    VarRef(2),
+                    var_ref(2),
                     Box::new(Expr::Constant(String::from("2"))),
                     Box::new(Expr::Constant(String::from("42"))),
                 )),
                 Instruction::While {
                     cond: Expr::LessThan(
-                        Box::new(Expr::Var(VarRef(1))),
+                        Box::new(Expr::Var(var_ref(1))),
                         Box::new(Expr::Constant(String::from("12"))),
                     ),
                     body: vec![Instruction::ExprStmt(Expr::Assign(
-                        VarRef(1),
+                        var_ref(1),
                         Box::new(Expr::Add(
-                            Box::new(Expr::Var(VarRef(1))),
+                            Box::new(Expr::Var(var_ref(1))),
                             Box::new(Expr::Constant(String::from("1"))),
                         )),
                     ))],
                 },
                 Instruction::ExprStmt(Expr::Constraint(
-                    VarRef(3),
+                    var_ref(3),
                     Box::new(Expr::ArrayIndex(
-                        VarRef(2),
+                        var_ref(2),
                         Box::new(Expr::Constant(String::from("2"))),
                     )),
                 )),

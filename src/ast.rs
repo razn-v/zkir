@@ -61,7 +61,7 @@ pub enum VariableRole {
 
 #[derive(Debug, Clone)]
 pub struct Variable {
-    pub id: VarRef,
+    pub var_ref: VarRef,
     pub name: String,
     pub var_type: VariableType,
     pub role: VariableRole,
@@ -104,10 +104,10 @@ impl Circuit {
         }
     }
 
-    pub fn get_variable(&self, varref: &VarRef) -> &Variable {
+    pub fn get_variable(&self, var_ref: &VarRef) -> &Variable {
         self.variables
             .iter()
-            .find(|var| var.id == *varref)
-            .expect(&format!("Variable {} not found", varref.id))
+            .find(|var| var.var_ref == *var_ref)
+            .expect(&format!("Variable {} not found", var_ref.id))
     }
 }
