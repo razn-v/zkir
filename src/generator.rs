@@ -67,7 +67,7 @@ impl ScopeStack {
         name: String,
         var_type: VariableType,
         role: VariableRole,
-        initialized: bool,
+        initialized: Vec<bool>,
     ) -> Variable {
         let var = Variable {
             var_ref: VarRef {
@@ -101,8 +101,12 @@ impl ScopeStack {
     fn mark_initialized(&mut self, var_id: &VarRef) {
         for scope in &mut self.stack {
             for var in &mut scope.vars {
-                if var.var_ref == *var_id && var.var_ref.idx == var_id.idx {
-                    var.initialized = true;
+                if var.var_ref.id == var_id.id {
+                    if let Some(idx) = var_id.idx {
+                        var.initialized[idx] = true;
+                    } else {
+                        var.initialized = vec![true];
+                    }
                     return;
                 }
             }
@@ -248,13 +252,16 @@ impl Generator {
             }
         });
 
+        let initialized: Vec<bool>;
+        if let VariableType::Array(n) = var_type {
+            initialized = vec![false; n];
+        } else {
+            initialized = vec![false];
+        }
+
         Some(Instruction::VarDecl(
-            self.scope_stack.add_var(
-                self.rng.rand_string(8),
-                var_type,
-                role,
-                default_value.is_some(),
-            ),
+            self.scope_stack
+                .add_var(self.rng.rand_string(8), var_type, role, initialized),
             default_value,
         ))
     }
@@ -303,6 +310,13 @@ impl Generator {
             if let Some(expr) = expr {
                 let idx = self.rng.rand(0, n - 1);
 
+                self.scope_stack.mark_initialized(&VarRef {
+                    id: var_ref.id,
+                    idx: Some(idx),
+                });
+
+                println!("{:?}", self.scope_stack.all_vars);
+
                 return Some(Instruction::ArrayAssign(
                     var_ref.clone(),
                     Box::new(Expr::Constant(idx.to_string())),
@@ -320,7 +334,10 @@ impl Generator {
             .get_scope_vars()
             .iter()
             .filter(|var| {
-                matches!(var.role, VariableRole::Signal(SignalType::Output)) && !var.initialized
+                // TODO: Support constraints on array indexes
+                matches!(var.role, VariableRole::Signal(SignalType::Output))
+                    && matches!(var.var_type, VariableType::Field)
+                    && !var.all_initialized()
             })
             .map(|var| var.var_ref.clone())
             .collect();
@@ -477,13 +494,13 @@ impl Generator {
         // Check if we have variables available for gen_var_ref
         let has_field_vars = self.has_vars_of_type(|var| {
             // We can only reference initialized variables in expressions
-            matches!(var.var_type, VariableType::Field) && var.initialized
+            matches!(var.var_type, VariableType::Field) && var.all_initialized()
         });
 
         // Check if we have arrays available for gen_array_index
         let has_array_vars = self.has_vars_of_type(|var| {
-            // We can only reference initialized arrays in expressions
-            matches!(var.var_type, VariableType::Array(_)) && var.initialized
+            // We can only reference initialized array indexes in expressions
+            matches!(var.var_type, VariableType::Array(_)) && var.any_initialized()
         });
 
         let mut funcs: Vec<fn(&mut Generator, depth: usize) -> Option<Expr>> = vec![
@@ -530,7 +547,7 @@ impl Generator {
             .get_scope_vars()
             .iter()
             .filter(|var| {
-                if !var.initialized {
+                if !var.all_initialized() {
                     false
                 } else {
                     matches!(var.var_type, VariableType::Field)
@@ -557,23 +574,25 @@ impl Generator {
             .get_scope_vars()
             .iter()
             .filter_map(|var| {
-                if let VariableType::Array(n) = var.var_type {
-                    if !var.initialized {
+                if let VariableType::Array(_) = var.var_type {
+                    if !var.any_initialized() {
                         return None;
                     }
-                    Some((var.var_ref.clone(), n))
+
+                    let indices = var.get_initialized();
+                    let idx = self.rng.rand(0, indices.len());
+
+                    Some((var.var_ref.clone(), idx))
                 } else {
                     None
                 }
             })
             .collect();
 
-        if let Some((var_ref, n)) = self.rng.rand_vec(&vars) {
-            let idx = self.rng.rand(0, n - 1);
-
+        if let Some((var_ref, idx)) = self.rng.rand_vec(&vars) {
             Some(Expr::Var(VarRef {
                 id: var_ref.id,
-                idx: Some(idx),
+                idx: Some(*idx),
             }))
         } else {
             None

@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, Clone)]
 pub struct VarRef {
     // Unique id used by the variable
     pub id: usize,
@@ -65,7 +65,26 @@ pub struct Variable {
     pub name: String,
     pub var_type: VariableType,
     pub role: VariableRole,
-    pub initialized: bool,
+    pub initialized: Vec<bool>,
+}
+
+impl Variable {
+    pub fn all_initialized(&self) -> bool {
+        self.initialized.iter().all(|&x| x)
+    }
+
+    pub fn any_initialized(&self) -> bool {
+        self.initialized.iter().any(|&x| x)
+    }
+
+    // Return only initialized indices
+    pub fn get_initialized(&self) -> Vec<usize> {
+        self.initialized
+            .iter()
+            .enumerate()
+            .filter_map(|(i, &x)| if x { Some(i) } else { None })
+            .collect()
+    }
 }
 
 #[derive(Clone)]
@@ -107,7 +126,7 @@ impl Circuit {
     pub fn get_variable(&self, var_ref: &VarRef) -> &Variable {
         self.variables
             .iter()
-            .find(|var| var.var_ref == *var_ref)
+            .find(|var| var.var_ref.id == var_ref.id)
             .expect(&format!("Variable {} not found", var_ref.id))
     }
 }
