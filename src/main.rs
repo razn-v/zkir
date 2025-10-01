@@ -88,5 +88,6 @@ fn main() {
     let mut file = std::fs::File::create("./circuit.circom").unwrap();
     file.write_all(output.as_bytes()).unwrap();
 
+    println!("{:#?}", circuit.instructions);
     println!("{}", output);
 }

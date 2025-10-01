@@ -87,7 +87,7 @@ impl Variable {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum Instruction {
     VarDecl(Variable, Option<Expr>),
     Assign(VarRef, Box<Expr>),

@@ -315,8 +315,6 @@ impl Generator {
                     idx: Some(idx),
                 });
 
-                println!("{:?}", self.scope_stack.all_vars);
-
                 return Some(Instruction::ArrayAssign(
                     var_ref.clone(),
                     Box::new(Expr::Constant(idx.to_string())),
