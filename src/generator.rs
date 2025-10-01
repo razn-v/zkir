@@ -188,7 +188,7 @@ impl Generator {
         let mut funcs: Vec<fn(&mut Generator) -> Option<Instruction>> = vec![
             Self::gen_var_decl_default,
             //Self::gen_if,
-            //Self::gen_for,
+            Self::gen_for,
             //Self::gen_while,
         ];
 
@@ -399,35 +399,38 @@ impl Generator {
     }
 
     pub fn gen_for(&mut self) -> Option<Instruction> {
-        let init: Option<Instruction>;
-
         self.scope_stack.enter_scope();
 
-        // If no variables are available, we always declare a new variable,
-        // otherwise we have a 4/5 chance
-        if !self.scope_stack.has_scope_vars() || self.rng.rand(1, 5) != 1 {
-            // Our variable *must* have a default value
-            let default_value = self.generate_expr(0)?;
-            init = self.gen_var_decl(
+        // We always declare a new variable,
+        // Our variable *must* have a default value, ranging from 0 to 30.
+        let default_value = self.rng.rand(0, 30);
+        let init = self
+            .gen_var_decl(
                 Some(VariableType::Field),
                 Some(VariableRole::Local),
-                Some(default_value),
-            );
-        } else {
-            init = self.gen_assign();
-        }
+                Some(Expr::Constant(default_value.to_string())),
+            )
+            .unwrap();
 
-        if init.is_none() {
-            unreachable!();
-        }
+        // Condition before we stop iterating
+        let max = self.rng.rand(default_value, 60);
 
-        let cond = self.generate_expr(0)?;
-        let step = if let Some(Instruction::Assign(varr, expr)) = self.gen_assign() {
-            Instruction::Assign(varr, expr)
-        } else {
-            //println!("No step found for FOR");
-            return None;
+        let Instruction::VarDecl(ref var, _) = init else {
+            unreachable!()
         };
+
+        let cond = Expr::LessThanEq(
+            Box::new(Expr::Var(var.var_ref.clone())),
+            Box::new(Expr::Constant(max.to_string())),
+        );
+
+        let step = Instruction::Assign(
+            var.var_ref.clone(),
+            Box::new(Expr::Add(
+                Box::new(Expr::Var(var.var_ref.clone())),
+                Box::new(Expr::Constant(String::from("1"))),
+            )),
+        );
 
         let mut body = Vec::<Instruction>::new();
         for _ in 0..self.rng.rand(1, 5) {
@@ -445,7 +448,7 @@ impl Generator {
         }
 
         Some(Instruction::For {
-            init: Box::new(init.unwrap()),
+            init: Box::new(init),
             cond: cond,
             step: Box::new(step),
             body: body,
